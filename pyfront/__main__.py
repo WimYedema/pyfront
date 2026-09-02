@@ -6,16 +6,14 @@ from pyfront.cmd.generate import run_generate
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
+@click.option("--debug", is_flag=True, help="Enable debug mode.")
 @click.version_option(package_name="pyfront", prog_name="pyfront")
-def main() -> None:
+def main(debug: bool) -> None:
     """Pyfront command line interface."""
+    if debug:
+        import logging
 
-
-@main.command("hello")
-@click.option("--name", default="world", show_default=True, help="Name to greet.")
-def hello(name: str) -> None:
-    """Print a greeting."""
-    click.echo(f"Hello, {name}! from pyfront")
+        logging.basicConfig(level=logging.DEBUG)
 
 
 @main.command("generate")

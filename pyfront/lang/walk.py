@@ -9,13 +9,18 @@ from .model import (
     GroupSymbol,
     IdExpr,
     IntExpr,
-    KeywordSymbol,
     LabeledSymbol,
+    MoreSymbol,
     NoneExpr,
+    OptionalSymbol,
+    ReferenceSymbol,
+    Rule,
+    RuleChoice,
     SeparatedSymbol,
     StringExpr,
     StringSymbol,
     Symbol,
+    SymbolsChoice,
     SymbolSequence,
     TrueExpr,
 )
@@ -35,12 +40,16 @@ def _into[Walk](type_name: str, walk: Walk, *args: Any) -> Iterable[None]:
     """Context manager to invoke a method on the Walk object."""
     _invoke_walk_method(walk, "pre_" + type_name, *args)
     try:
-        yield
+        method = getattr(walk, "into_" + type_name, None)
+        if callable(method):
+            yield from method(*args)
+        else:
+            yield
     finally:
         _invoke_walk_method(walk, "post_" + type_name, *args)
 
 
-def walk_symbol[Walk](symbol: Symbol, walk: Walk) -> None:
+def walk_symbol[Walk](symbol: Symbol, walk: Walk) -> Walk:
     """Walk through a Symbol object."""
     with _into("symbol", walk, symbol):
         match symbol:
@@ -54,22 +63,30 @@ def walk_symbol[Walk](symbol: Symbol, walk: Walk) -> None:
                 with _into("separated_symbol", walk, symbol):
                     walk_symbol(inner_symbol, walk)
                     walk_symbol(separator, walk)
-            case KeywordSymbol(keyword=_):
-                with _into("keyword_symbol", walk, symbol):
+            case ReferenceSymbol(name=_):
+                with _into("reference_symbol", walk, symbol):
                     pass  # No further action needed for KeywordSymbol
-            case GroupSymbol(symbols=symbols, optional=_, multiple=_):
+            case OptionalSymbol(symbols=symbols):
+                with _into("optional_symbol", walk, symbol):
+                    walk_symbol_sequence(symbols, walk)
+            case MoreSymbol(symbols=symbols, optional=_):
+                with _into("more_symbol", walk, symbol):
+                    walk_symbol_sequence(symbols, walk)
+            case GroupSymbol(symbols=symbols):
                 with _into("group_symbol", walk, symbol):
                     walk_symbol_sequence(symbols, walk)
+    return walk
 
 
-def walk_symbol_sequence[Walk](symbol_sequence: SymbolSequence, walk: Walk) -> None:
+def walk_symbol_sequence[Walk](symbol_sequence: SymbolSequence, walk: Walk) -> Walk:
     """Walk through a SymbolSequence object."""
     with _into("symbol_sequence", walk, symbol_sequence):
         for sym in symbol_sequence.symbols:
             walk_symbol(sym, walk)
+    return walk
 
 
-def walk_expression[Walk](expr, walk: Walk) -> None:
+def walk_expression[Walk](expr, walk: Walk) -> Walk:
     """Walk through an Expression object."""
     with _into("expression", walk, expr):
         match expr:
@@ -94,30 +111,48 @@ def walk_expression[Walk](expr, walk: Walk) -> None:
             case NoneExpr():
                 with _into("none_expr", walk, expr):
                     pass  # No further action needed for NoneExpr
+    return walk
 
 
-def walk_field[Walk](field, walk: Walk) -> None:
+def walk_field[Walk](field, walk: Walk) -> Walk:
     """Walk through a Field object."""
     with _into("field", walk, field):
         walk_symbol(field.type, walk)
         if field.value is not None:
             walk_expression(field.value, walk)
+    return walk
 
 
-def walk_rule[Walk](rule, walk: Walk) -> None:
+def walk_choice[Walk](choice, walk: Walk) -> Walk:
+    """Walk through a Choice object."""
+    with _into("choice", walk, choice):
+        match choice:
+            case RuleChoice(rule=rule):
+                with _into("rule_choice", walk, choice):
+                    walk_rule_base(rule, walk)
+            case SymbolsChoice(symbols=symbols):
+                with _into("symbols_choice", walk, choice):
+                    walk_symbol_sequence(symbols, walk)
+    return walk
+
+
+def walk_rule_base[Walk](rule, walk: Walk) -> Walk:
     """Walk through a Rule object."""
-    with _into("rule", walk, rule):
-        for field in rule.fields:
-            walk_field(field, walk)
-        walk_symbol_sequence(rule.terms, walk)
-        for alt in rule.alts or []:
-            walk_rule(alt, walk)
-        if rule.post_terms is not None:
-            walk_symbol_sequence(rule.post_terms, walk)
+    with _into("rule_base", walk, rule):
+        match rule:
+            case Rule(terms=terms, choices=choices):
+                with _into("rule", walk, rule):
+                    for field in rule.fields:
+                        walk_field(field, walk)
+                    walk_symbol_sequence(terms, walk)
+                    for choice in choices or []:
+                        walk_choice(choice, walk)
+    return walk
 
 
-def walk_front[Walk](front: Front, walk: Walk) -> None:
+def walk_front[Walk](front: Front, walk: Walk) -> Walk:
     """Walk through a Front object."""
     with _into("front", walk, front):
         for rule in front.rules:
-            walk_rule(rule, walk)
+            walk_rule_base(rule, walk)
+    return walk

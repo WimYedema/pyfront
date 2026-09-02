@@ -1,39 +1,28 @@
-Front ROOT ::= rules: {MainRule};
+Front ROOT ::= rules: {Rule} scan_rules: {ScanRule};
 
 Rule ::= 
-    FIELD name: String
-    FIELD symbols: {Symbol}
-    FIELD is_root: Bool = False
-    FIELD super_type: [Ident] = None
-
-    < MainRule | AlternativeRule >
+    name: Ident is_root: ["ROOT"] super_type: ["<" Ident ] "::=" 
+    fields: {Field}
+    terms: SymbolSequence
+    choices: [ "<" ( Choice / "|" ) ">"] ";"
     ;
 
-MainRule < Rule ::= 
-    name: String is_root: ["ROOT"] super_type: ["<" Ident ] 
-    "::=" symbols: {Symbol} 
-    alternatives: [ "<" ( Alternative / "|" ) ">"]
-    post_symbols: {Symbol}
-    ;
-
-AlternativeRule < Rule ::= 
-    name: String "::=" symbols: {Symbol}
-    ;
-
-Symbol ::= < LabeledSymbol | KeywordSymbol | StringSymbol | SeparatedSymbol | GroupSymbol | OptionalSymbol | MoreSymbol >;
-
-LabeledSymbol < Symbol ::= label: String ":" symbol: Symbol ;
-KeywordSymbol < Symbol ::= keyword: Ident;
-StringSymbol < Symbol ::= value: String;
-SeparatedSymbol < Symbol ::= symbol: Symbol "/" separator: String;
-GroupSymbol < Symbol ::= "(" symbols: {Symbol} ")";
-OptionalSymbol < Symbol ::= "[" symbols: {Symbol} "]";
-MoreSymbol < Symbol ::= "{" symbols: {Symbol} "}" plus: ["+"];
-
-Alternative ::= 
-    < AlternativeRef ::= name: Ident 
-    | AlternativeDef ::= rule: AlternativeRule
+Choice ::=
+    < RuleChoice ::= rule: Rule
+    | SymbolsChoice ::= symbols: SymbolSequence
     >;
+
+SymbolSequence ::= symbols: {SeparatedSymbol};
+
+Symbol ::= < LabeledSymbol | ReferenceSymbol | StringSymbol | GroupSymbol | OptionalSymbol | MoreSymbol >;
+SeparatedSymbol < Symbol ::= symbol: Symbol ["/" separator: String];
+
+LabeledSymbol < Symbol ::= label: Ident ":" symbol: Symbol ;
+ReferenceSymbol < Symbol ::= name: Ident;
+StringSymbol < Symbol ::= value: String;
+GroupSymbol < Symbol ::= "(" symbols: {SeparatedSymbol} ")";
+OptionalSymbol < Symbol ::= "[" symbols: {SeparatedSymbol} "]";
+MoreSymbol < Symbol ::= "{" symbols: {SeparatedSymbol} "}" plus: ["+"];
 
 Field ::= "FIELD" name: String ":" symbol: Symbol value: [ "=" Expression ];
 
@@ -46,3 +35,11 @@ Expression ::=
     | FalseExpr ::= "False"
     | NoneExpr ::= "None"
     >;
+
+ScanRule ::= 
+    "SCAN" name: String ":" type: Ident "::=" pattern: String;
+
+SCAN String: String ::= "\"(?:[^\"\\]|\\.)*\"";
+SCAN Ident: Ident ::= "[a-zA-Z_][a-zA-Z0-9_]*";
+SCAN Int: Int ::= "[0-9]+";
+SCAN Float: Float ::= "[0-9]+\.[0-9]+";

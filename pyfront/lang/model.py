@@ -11,16 +11,25 @@ class SymbolSequence:
     symbols: list[Symbol]
     type: list[str] | None = None
 
+    def __str__(self) -> str:
+        return " ".join(str(symbol) for symbol in self.symbols)
+
 
 @dataclass
 class LabeledSymbol(Symbol):
     label: str
     symbol: Symbol
 
+    def __str__(self) -> str:
+        return f"{self.label}: {self.symbol}"
+
 
 @dataclass
 class StringSymbol(Symbol):
     value: str
+
+    def __str__(self) -> str:
+        return f"{self.value}"
 
 
 @dataclass
@@ -28,18 +37,42 @@ class SeparatedSymbol(Symbol):
     symbol: Symbol
     separator: str
 
+    def __str__(self) -> str:
+        return f'{self.symbol} / "{self.separator}"'
+
 
 @dataclass
-class KeywordSymbol(Symbol):
-    keyword: str
+class ReferenceSymbol(Symbol):
+    name: str
     rule: Rule | None = None
+
+    def __str__(self) -> str:
+        return self.name
 
 
 @dataclass
 class GroupSymbol(Symbol):
     symbols: SymbolSequence
+
+    def __str__(self) -> str:
+        return f"( {self.symbols} )"
+
+
+@dataclass
+class OptionalSymbol(Symbol):
+    symbols: SymbolSequence
+
+    def __str__(self) -> str:
+        return f"[ {self.symbols} ]"
+
+
+@dataclass
+class MoreSymbol(Symbol):
+    symbols: SymbolSequence
     optional: bool = False
-    multiple: bool = False
+
+    def __str__(self) -> str:
+        return f"{{ {self.symbols} }}{'' if self.optional else '+'}"
 
 
 @dataclass
@@ -90,19 +123,55 @@ class Field:
 
 
 @dataclass
+class Choice:
+    pass
+
+
+@dataclass
+class RuleChoice(Choice):
+    rule: Rule
+
+    def __str__(self) -> str:
+        return str(self.rule)
+
+
+@dataclass
+class SymbolsChoice(Choice):
+    symbols: SymbolSequence
+
+    def __str__(self) -> str:
+        return str(self.symbols)
+
+
+@dataclass
 class Rule:
     is_root: bool
     name: str
     super_type: str | None
     fields: list[Field]
     terms: SymbolSequence
-    alts: list[Rule] | None
-    post_terms: SymbolSequence | None
+    choices: list[Choice] | None
 
-    is_ref: bool = False
-    super_rule: Rule | None = None
+    def __str__(self) -> str:
+        terms_str = " ".join(str(term) for term in self.terms.symbols)
+        if not self.choices:
+            return f"{self.name} ::= {terms_str}"
+        else:
+            choices_str = " | ".join(str(choice) for choice in self.choices)
+            return f"{self.name} ::= {terms_str} < {choices_str} >"
+
+
+@dataclass
+class ScanRule:
+    name: str
+    type: str
+    pattern: str
+
+    def __str__(self) -> str:
+        return f"SCAN {self.name} : {self.type} ::= {self.pattern}"
 
 
 @dataclass
 class Front:
     rules: list[Rule]
+    scan_rules: list[ScanRule]

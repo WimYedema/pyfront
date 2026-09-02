@@ -1,6 +1,6 @@
 from typing import Self
 
-from pyfront.lang.model import Front, KeywordSymbol, Rule
+from pyfront.lang.model import Front, ReferenceSymbol, Rule
 from pyfront.lang.walk import walk_front
 
 
@@ -28,13 +28,10 @@ class SymbolTable:
         return symbol
 
     def pre_rule(self, rule: Rule) -> None:
-        if rule.is_ref:
-            return
         self.add_symbol(rule.name, rule)
-        rule.super_rule = self.get_symbol(rule.super_type, Rule) if rule.super_type else None
 
-    def pre_keyword_symbol(self, symbol: KeywordSymbol) -> None:
-        symbol.rule = self.get_symbol(symbol.keyword, Rule)
+    def pre_reference_symbol(self, symbol: ReferenceSymbol) -> None:
+        symbol.rule = self.get_symbol(symbol.name, Rule)
 
     @classmethod
     def populate(cls, front: Front) -> Self:

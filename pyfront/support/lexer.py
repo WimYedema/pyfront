@@ -1,7 +1,10 @@
+import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol, TypeVar
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -26,12 +29,13 @@ T = TypeVar("T", bound=Enum)
 @dataclass
 class Token[T]:
     type: T
-    value: str
+    value: str | None
     position: Position
 
 
 class TokenDef[T](Protocol):
     WhitespaceRegexs: dict[str, str]
+    LiteralText: dict[T, str]
     TokenRegex: dict[T, str]
 
 
@@ -87,12 +91,23 @@ class Lexer[T]:
             return Token(self.eof_token, "", self.position)  # Return EOF token
         if self.current_char is None:
             return None  # End of input
+        best_match = ""
+        best_token_type = None
+        token_value = None
+        for token_type, text in self.token_def.LiteralText.items():
+            match = re.match(text, self.source_code[self.position.charno :])
+            if match and len(match.group(0)) > len(best_match):
+                best_token_type = token_type
+                best_match = match.group(0)
 
         for token_type, regex in self.token_def.TokenRegex.items():
             match = re.match(regex, self.source_code[self.position.charno :])
-            if match:
-                token_value = match.group(0)
-                return Token(token_type, token_value, self.advance(token_value))
+            if match and len(match.group(0)) > len(best_match):
+                best_token_type = token_type
+                best_match = match.group(0)
+                token_value = best_match
+        if best_token_type is not None:
+            return Token(best_token_type, token_value, self.advance(best_match))
 
         raise SyntaxError(self.current_char, self.position)
 

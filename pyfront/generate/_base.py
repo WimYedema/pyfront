@@ -1,12 +1,24 @@
-from pathlib import Path
+from textwrap import dedent
+from typing import Self
+
+from pyfront.generate.emitter import Emitter
 
 
 class GeneratorBase:
-    def __init__(self) -> None:
-        self.output = ""
+    def __init__(self, emitter: Emitter) -> None:
+        self.emitter = emitter
 
-    def print(self, text: str = "") -> None:
-        self.output += text + "\n"
+    def emit(self, text: str = "") -> Self:
+        if text[0:2] == "\n ":
+            self.emitter.emit(dedent(text[1:]))
+        else:
+            self.emitter.emit(dedent(text))
+        return self
 
-    def emit(self, path: Path) -> None:
-        path.write_text(self.output, encoding="utf-8")
+    def indent(self) -> Self:
+        self.emitter.indent += self.emitter.indentation
+        return self
+
+    def dedent(self) -> Self:
+        self.emitter.indent -= self.emitter.indentation
+        return self
