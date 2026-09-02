@@ -1,7 +1,9 @@
 from pathlib import Path
 
+from pyfront.generate.emitter import FolderEmitter
 from pyfront.generate.model import GenerateModel
 from pyfront.generate.parser import GenerateParser
+from pyfront.generate.report import start_report, stop_report
 from pyfront.lang.grammar import Tokenizer, TokenType, parse_front
 from pyfront.lang.parser import Parser
 from pyfront.normalize import Normalize
@@ -21,10 +23,9 @@ def run_generate(front_file: Path, output_dir: Path) -> None:
     SymbolTable.populate(front)
     Normalize(front).run()
 
-    model_generator = GenerateModel(front).run()
-    parser_generator = GenerateParser(front).run()
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    model_generator.emit(output_dir / "model.py")
-    parser_generator.emit(output_dir / "parser.py")
+    emitter = FolderEmitter(output_dir)
+    start_report(emitter)
+    with emitter.open("model.py") as model_emitter, emitter.open("parser.py") as parser_emitter:
+        GenerateModel(front, model_emitter).run()
+        GenerateParser(front, parser_emitter).run()
+    stop_report()

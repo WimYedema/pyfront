@@ -19,7 +19,6 @@ class Parser[T]:
         """Advance to the next token."""
         self.last_token = self.next_token
         self.next_token = self.lexer.get_next_token()
-        # print(f"Accepted token: {self.last_token}, next token: {self.next_token}")
 
     def match(self, token_type: T) -> bool:
         """Check if the next token matches the given type."""

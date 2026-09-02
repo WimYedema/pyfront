@@ -1,8 +1,12 @@
-from dataclasses import dataclass
+import logging
 from enum import Enum
 from typing import Protocol
 
 from .lexer import Lexer, Token
+
+logger = logging.getLogger(__name__)
+
+undefined = object()
 
 
 class Terminals(Enum):
@@ -11,19 +15,6 @@ class Terminals(Enum):
 
 class NonTerminals(Enum):
     pass
-
-
-@dataclass
-class Label:
-    label: str
-    value: object
-
-    def unwrap(self) -> tuple[str, object]:
-        return self.label, self.value
-
-    @property
-    def name(self) -> str:
-        return f"{self.label}:{self.value.name}"
 
 
 class LlSyntaxError(Exception):
@@ -42,6 +33,7 @@ class UnexpectedEOF(Exception):
 
 class Rule(Protocol):
     terms: list[NonTerminals]
+    argument_names: list[str]
 
     def build(self, **kwargs: object) -> object:
         raise NotImplementedError
@@ -56,15 +48,22 @@ class Grammar(Protocol):
 class Reduce:
     def __init__(self, rule: Rule):
         self.rule = rule
-        self.count = len(rule.terms)
+        self.argument_names = rule.argument_names
 
     @property
     def name(self) -> str:
         return self.rule.__class__.__name__
 
-    def build(self, values: list[tuple[str | None, object]]) -> object:
-        kwargs = {label: value for label, value in values if label is not None}
+    def reduce(self, values: list[object]) -> object:
+        assert len(values) == len(self.argument_names), (
+            f"Expected {len(self.argument_names)} values, got {len(values)}"
+        )
+
+        kwargs = {label: value for label, value in zip(self.argument_names, values, strict=True)}
         return self.rule.build(**kwargs)
+
+    def __str__(self) -> str:
+        return f"Reduce({self.name})"
 
 
 class LlParser:
@@ -72,36 +71,50 @@ class LlParser:
         self.grammar = grammar
 
     def parse(self, tokens: Lexer[Terminals]) -> object:
-        stack: list[Reduce | Label | Terminals | NonTerminals] = [
+        stack: list[Reduce | Terminals | NonTerminals] = [
             tokens.eof_token,
             self.grammar.start,
         ]
 
-        values: list[tuple[str | None, object]] = []
+        values: list[object] = []
         tokens = iter(tokens)
         current_token = next(tokens, None)
         while stack:
-            print(
-                f"Values: {values}\nCurrent Token: {current_token.type if current_token else None} Stack: {[item.name for item in reversed(stack)]}\n"
+            logger.debug(
+                "Values: %s",
+                values,
+            )
+            logger.debug(
+                "current token: %s(%s)",
+                current_token.type if current_token else None,
+                current_token.value if current_token else None,
+            )
+            logger.debug(
+                "stack: %s",
+                " ".join(item.name for item in reversed(stack)),
             )
             top = stack.pop()
-            if isinstance(top, Label):
-                label, top = top.unwrap()
-            else:
-                label = None
             if isinstance(top, Reduce):
-                # All children parsed; their values are the last `count` on the value stack
-                children = values[len(values) - top.count :]
-                del values[len(values) - top.count :]
-                values.append((label, top.build(children)))
+                count = len(top.argument_names)
+                children = values[len(values) - count :]
+                logger.debug(
+                    "reducing %s with children: %s",
+                    top.name,
+                    children,
+                )
+                del values[len(values) - count :]
+                rv = top.reduce(children)
+                if rv is not undefined:
+                    values.append(rv)
             elif isinstance(top, Terminals):
                 if current_token.type == top:
-                    values.append((label, current_token.value))
+                    values.append(current_token.value)
                     current_token = next(tokens, None)
 
                 else:
                     raise LlSyntaxError(
-                        current_token, f"Unexpected {current_token.type}, expected: {top}"
+                        current_token,
+                        f"Unexpected {current_token.type}:{current_token.value}, expected: {top}",
                     )
             elif isinstance(top, NonTerminals):
                 if current_token is None:
@@ -111,10 +124,10 @@ class LlParser:
                     next_rule = self.grammar.rules[
                         self.grammar.parse_table[top][current_token.type]
                     ]
-                    stack.append(Label(label, Reduce(next_rule)))
+                    stack.append(Reduce(next_rule))
                     for term in reversed(next_rule.terms):
                         stack.append(term)
                 else:
                     raise LlSyntaxError(current_token, f"Unexpected {current_token.type}")
 
-        return values[0][1] if values else None
+        return values[0] if values else None

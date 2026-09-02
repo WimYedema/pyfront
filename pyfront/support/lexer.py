@@ -1,7 +1,10 @@
+import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol, TypeVar
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -87,12 +90,16 @@ class Lexer[T]:
             return Token(self.eof_token, "", self.position)  # Return EOF token
         if self.current_char is None:
             return None  # End of input
-
+        best_match = ""
+        best_token_type = None
         for token_type, regex in self.token_def.TokenRegex.items():
             match = re.match(regex, self.source_code[self.position.charno :])
-            if match:
-                token_value = match.group(0)
-                return Token(token_type, token_value, self.advance(token_value))
+            if match and len(match.group(0)) > len(best_match):
+                best_match = match.group(0)
+                best_token_type = token_type
+        if best_token_type is not None:
+            token_value = best_match
+            return Token(best_token_type, token_value, self.advance(token_value))
 
         raise SyntaxError(self.current_char, self.position)
 

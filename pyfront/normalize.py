@@ -19,27 +19,27 @@ class Normalize:
 
     def pre_rule(self, rule: Rule) -> None:
         self.current_rule = rule
-        new_rules = []
-        for alt in rule.alts or []:
-            if not alt.is_ref:
-                alt.super_type = self.current_rule.name
-                alt.super_rule = self.current_rule
+        # new_rules = []
+        # for alt in rule.alts or []:
+        #     if not alt.is_ref:
+        #         alt.super_type = self.current_rule.name
+        #         alt.super_rule = self.current_rule
 
-                self.front.rules.append(alt)
-                new_rules.append(
-                    Rule(
-                        is_root=False,
-                        name=alt.name,
-                        super_type=None,
-                        fields=[],
-                        terms=SymbolSequence(symbols=[]),
-                        is_ref=True,
-                    )
-                )
-            else:
-                new_rules.append(alt)
+        #         self.front.rules.append(alt)
+        #         new_rules.append(
+        #             Rule(
+        #                 is_root=False,
+        #                 name=alt.name,
+        #                 super_type=None,
+        #                 fields=[],
+        #                 terms=SymbolSequence(symbols=[]),
+        #                 is_ref=True,
+        #             )
+        #         )
+        #     else:
+        #         new_rules.append(alt)
 
-        rule.alts = new_rules
+        # rule.alts = new_rules
 
     def pre_labeled_symbol(self, symbol: LabeledSymbol) -> None:
         self.current_label.append(symbol.label)

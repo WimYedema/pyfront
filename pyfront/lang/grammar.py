@@ -13,6 +13,7 @@ from .model import (
     LabeledSymbol,
     NoneExpr,
     Rule,
+    ScanRule,
     SeparatedSymbol,
     StringExpr,
     StringSymbol,
@@ -87,7 +88,7 @@ class Tokenizer:
         TokenType.IDENT: r"[a-zA-Z_][a-zA-Z0-9_]*",
         TokenType.FLOAT: r"\d+\.\d+",
         TokenType.INT: r"\d+",
-        TokenType.STRING: r'"[^"]*"',
+        TokenType.STRING: r'"(?:[^"\\]|\\.)*"',
     }
 
     WhitespaceRegexs = {
@@ -186,7 +187,7 @@ def parse_symbol_sequence(parser: Parser[TokenType]) -> SymbolSequence:
     return SymbolSequence(symbols=symbols)
 
 
-def parse_altrule(parser: Parser[TokenType]) -> Rule:
+def parse_subrule(parser: Parser[TokenType]) -> Rule:
     """Parse a single rule from the lexer."""
     name = parser.expect(TokenType.IDENT)
     if not parser.match(TokenType.DEFINES):
@@ -197,7 +198,6 @@ def parse_altrule(parser: Parser[TokenType]) -> Rule:
             fields=[],
             terms=SymbolSequence(symbols=[]),
             alts=None,
-            post_terms=None,
             is_ref=True,
         )
 
@@ -208,7 +208,14 @@ def parse_altrule(parser: Parser[TokenType]) -> Rule:
     parser.push_terminator(TokenType.GREATER_THAN, TokenType.OR)
     symbols = parse_symbol_sequence(parser)
     parser.pop_terminator(TokenType.GREATER_THAN, TokenType.OR)
-    return Rule(is_root=False, name=name, super_type=None, fields=fields, terms=symbols)
+    return Rule(
+        is_root=False,
+        name=name,
+        super_type=None,
+        fields=fields,
+        terms=symbols,
+        alts=None,
+    )
 
 
 def parse_rule(parser: Parser[TokenType]) -> Rule:
@@ -228,12 +235,10 @@ def parse_rule(parser: Parser[TokenType]) -> Rule:
 
     if parser.last_token.type == TokenType.LESS_THAN:
         with parser.terminator(TokenType.GREATER_THAN):
-            alternatives = [parse_altrule(parser) for _ in parser.multiple(separator=TokenType.OR)]
-        with parser.terminator(TokenType.SEMICOLON):
-            post_symbols = parse_symbol_sequence(parser)
+            alternatives = [parse_subrule(parser) for _ in parser.multiple(separator=TokenType.OR)]
+        parser.expect(TokenType.SEMICOLON)
     else:
         alternatives = None
-        post_symbols = None
 
     return Rule(
         is_root=is_root,
@@ -242,11 +247,29 @@ def parse_rule(parser: Parser[TokenType]) -> Rule:
         fields=fields,
         terms=symbols,
         alts=alternatives,
-        post_terms=post_symbols,
     )
+
+
+def parse_scan_rule(parser: Parser[TokenType]) -> ScanRule:
+    """Parse a scan rule from the lexer."""
+    parser.expect(TokenType.SCAN)
+    name = parser.expect(TokenType.IDENT)
+    parser.expect(TokenType.COLON)
+    type_ = parser.expect(TokenType.IDENT)
+    parser.expect(TokenType.DEFINES)
+    pattern = parser.expect(TokenType.STRING)
+    parser.expect(TokenType.SEMICOLON)
+    return ScanRule(name=name, type=type_, pattern=pattern)
 
 
 def parse_front(parser: Parser[TokenType]) -> Front:
     """Parse a .front file using the provided lexer."""
-    with parser.terminator(TokenType._EOF):
-        return Front(rules=[parse_rule(parser) for _ in parser.multiple()])
+    parser.push_terminator(TokenType._EOF, TokenType.SCAN)
+    rules = [parse_rule(parser) for _ in parser.multiple()]
+    parser.pop_terminator(TokenType._EOF, TokenType.SCAN)
+    if parser.next_token and parser.next_token.type == TokenType.SCAN:
+        with parser.terminator(TokenType._EOF):
+            scan_rules = [parse_scan_rule(parser) for _ in parser.multiple()]
+    else:
+        scan_rules = []
+    return Front(rules=rules, scan_rules=scan_rules)
