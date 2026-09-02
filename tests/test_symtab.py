@@ -1,23 +1,23 @@
 import unittest
 
-from pyfront.lang.model import Front, KeywordSymbol, Rule, SymbolSequence
+from pyfront.lang.model import Front, ReferenceSymbol, Rule, SymbolSequence
 from pyfront.symtab import SymbolTable
 
 
-def rule(name: str, terms: list[KeywordSymbol]) -> Rule:
+def rule(name: str, terms: list[ReferenceSymbol]) -> Rule:
     return Rule(
         is_root=False,
         name=name,
         super_type=None,
         fields=[],
         terms=SymbolSequence(terms),
-        alts=None,
+        choices=None,
     )
 
 
 class SymbolTableTests(unittest.TestCase):
     def test_populate_resolves_forward_keyword_references(self) -> None:
-        reference = KeywordSymbol("Later")
+        reference = ReferenceSymbol("Later")
         earlier = rule("Earlier", [reference])
         later = rule("Later", [])
 

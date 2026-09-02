@@ -9,14 +9,18 @@ from .model import (
     GroupSymbol,
     IdExpr,
     IntExpr,
-    KeywordSymbol,
     LabeledSymbol,
+    MoreSymbol,
     NoneExpr,
+    OptionalSymbol,
+    ReferenceSymbol,
     Rule,
+    RuleChoice,
     SeparatedSymbol,
     StringExpr,
     StringSymbol,
     Symbol,
+    SymbolsChoice,
     SymbolSequence,
     TrueExpr,
 )
@@ -59,10 +63,16 @@ def walk_symbol[Walk](symbol: Symbol, walk: Walk) -> Walk:
                 with _into("separated_symbol", walk, symbol):
                     walk_symbol(inner_symbol, walk)
                     walk_symbol(separator, walk)
-            case KeywordSymbol(keyword=_):
-                with _into("keyword_symbol", walk, symbol):
+            case ReferenceSymbol(name=_):
+                with _into("reference_symbol", walk, symbol):
                     pass  # No further action needed for KeywordSymbol
-            case GroupSymbol(symbols=symbols, optional=_, multiple=_):
+            case OptionalSymbol(symbols=symbols):
+                with _into("optional_symbol", walk, symbol):
+                    walk_symbol_sequence(symbols, walk)
+            case MoreSymbol(symbols=symbols, optional=_):
+                with _into("more_symbol", walk, symbol):
+                    walk_symbol_sequence(symbols, walk)
+            case GroupSymbol(symbols=symbols):
                 with _into("group_symbol", walk, symbol):
                     walk_symbol_sequence(symbols, walk)
     return walk
@@ -113,17 +123,30 @@ def walk_field[Walk](field, walk: Walk) -> Walk:
     return walk
 
 
+def walk_choice[Walk](choice, walk: Walk) -> Walk:
+    """Walk through a Choice object."""
+    with _into("choice", walk, choice):
+        match choice:
+            case RuleChoice(rule=rule):
+                with _into("rule_choice", walk, choice):
+                    walk_rule_base(rule, walk)
+            case SymbolsChoice(symbols=symbols):
+                with _into("symbols_choice", walk, choice):
+                    walk_symbol_sequence(symbols, walk)
+    return walk
+
+
 def walk_rule_base[Walk](rule, walk: Walk) -> Walk:
     """Walk through a Rule object."""
     with _into("rule_base", walk, rule):
         match rule:
-            case Rule(terms=terms, alts=alts):
+            case Rule(terms=terms, choices=choices):
                 with _into("rule", walk, rule):
                     for field in rule.fields:
                         walk_field(field, walk)
                     walk_symbol_sequence(terms, walk)
-                    for alt in alts or []:
-                        walk_rule_base(alt, walk)
+                    for choice in choices or []:
+                        walk_choice(choice, walk)
     return walk
 
 

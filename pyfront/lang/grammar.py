@@ -1,6 +1,7 @@
 from enum import Enum, auto
 
 from .model import (
+    Choice,
     Expression,
     FalseExpr,
     Field,
@@ -9,15 +10,19 @@ from .model import (
     GroupSymbol,
     IdExpr,
     IntExpr,
-    KeywordSymbol,
     LabeledSymbol,
+    MoreSymbol,
     NoneExpr,
+    OptionalSymbol,
+    ReferenceSymbol,
     Rule,
+    RuleChoice,
     ScanRule,
     SeparatedSymbol,
     StringExpr,
     StringSymbol,
     Symbol,
+    SymbolsChoice,
     SymbolSequence,
     TrueExpr,
 )
@@ -109,7 +114,7 @@ def parse_symbol(parser: Parser[TokenType]) -> Symbol:
                 label = token.value
                 symbol = parse_symbol(parser)
                 return LabeledSymbol(label=label, symbol=symbol)
-            return KeywordSymbol(keyword=token.value)
+            return ReferenceSymbol(name=token.value)
         case TokenType.STRING:
             parser.advance()
             return StringSymbol(value=token.value)
@@ -122,13 +127,13 @@ def parse_symbol(parser: Parser[TokenType]) -> Symbol:
             parser.advance()
             with parser.terminator(TokenType.RBRACKET):
                 symbols = parse_symbol_sequence(parser)
-            return GroupSymbol(symbols=symbols, optional=True)
+            return OptionalSymbol(symbols=symbols)
         case TokenType.LBRACE:
             parser.advance()
             with parser.terminator(TokenType.RBRACE):
                 symbols = parse_symbol_sequence(parser)
             optional = not parser.match(TokenType.PLUS)
-            return GroupSymbol(symbols=symbols, multiple=True, optional=optional)
+            return MoreSymbol(symbols=symbols, optional=optional)
         case _:
             raise SyntaxError(f"Unexpected token: {token}")
 
@@ -188,20 +193,14 @@ def parse_symbol_sequence(parser: Parser[TokenType]) -> SymbolSequence:
     return SymbolSequence(symbols=symbols)
 
 
-def parse_subrule(parser: Parser[TokenType]) -> Rule:
+def parse_choice(parser: Parser[TokenType]) -> Choice:
     """Parse a single rule from the lexer."""
-    name = parser.expect(TokenType.IDENT)
-    if not parser.match(TokenType.DEFINES):
-        return Rule(
-            is_root=False,
-            name=name,
-            super_type=None,
-            fields=[],
-            terms=SymbolSequence(symbols=[]),
-            alts=None,
-            is_ref=True,
-        )
+    match = parser.match(TokenType.IDENT, TokenType.DEFINES)
+    if not match:
+        seq = parse_symbol_sequence(parser)
+        return SymbolsChoice(symbols=seq)
 
+    name, _ = match
     fields = []
     while parser.match(TokenType.FIELD):
         fields.append(parse_field(parser))
@@ -209,13 +208,15 @@ def parse_subrule(parser: Parser[TokenType]) -> Rule:
     parser.push_terminator(TokenType.GREATER_THAN, TokenType.OR)
     symbols = parse_symbol_sequence(parser)
     parser.pop_terminator(TokenType.GREATER_THAN, TokenType.OR)
-    return Rule(
-        is_root=False,
-        name=name,
-        super_type=None,
-        fields=fields,
-        terms=symbols,
-        alts=None,
+    return RuleChoice(
+        Rule(
+            is_root=False,
+            name=name,
+            super_type=None,
+            fields=fields,
+            terms=symbols,
+            choices=None,
+        )
     )
 
 
@@ -236,10 +237,10 @@ def parse_rule(parser: Parser[TokenType]) -> Rule:
 
     if parser.last_token.type == TokenType.LESS_THAN:
         with parser.terminator(TokenType.GREATER_THAN):
-            alternatives = [parse_subrule(parser) for _ in parser.multiple(separator=TokenType.OR)]
+            choices = [parse_choice(parser) for _ in parser.multiple(separator=TokenType.OR)]
         parser.expect(TokenType.SEMICOLON)
     else:
-        alternatives = None
+        choices = None
 
     return Rule(
         is_root=is_root,
@@ -247,7 +248,7 @@ def parse_rule(parser: Parser[TokenType]) -> Rule:
         super_type=super_type,
         fields=fields,
         terms=symbols,
-        alts=alternatives,
+        choices=choices,
     )
 
 

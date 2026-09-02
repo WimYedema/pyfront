@@ -207,9 +207,13 @@ class TupleType(CompoundType):
         return tuple_type
 
     def list(self) -> Type:
+        if len(self.fields) == 1:
+            return self.fields[0].type.list()
         return TupleType.make({fld.name: fld.type.list() for fld in self.fields})
 
     def optional(self) -> Type:
+        if len(self.fields) == 1:
+            return self.fields[0].type.optional()
         return TupleType.make({fld.name: fld.type.optional() for fld in self.fields})
 
 
@@ -220,6 +224,22 @@ class Model:
     def finalize(self) -> None:
         for record in self.records:
             record.finalize()
+        # topologically sort records such that super-types come first
+        seen = set()
+        sorted_records = []
+
+        def visit(record: RecordType) -> None:
+            if record.name in seen:
+                return
+            if record.super_type is not None:
+                visit(record.super_type)
+            seen.add(record.name)
+            sorted_records.append(record)
+
+        for record in self.records:
+            visit(record)
+
+        self.records = sorted_records
 
     def new_record(self, name: str, super_type: RecordType | None = None) -> RecordType:
         existing = self.find_type_by_name(name)

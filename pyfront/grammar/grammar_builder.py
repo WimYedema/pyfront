@@ -5,16 +5,21 @@ import pyfront.grammar.model as gm
 import pyfront.types.model as types
 from pyfront.generate.report import report
 from pyfront.lang.model import (
+    Choice,
     FalseExpr,
     Front,
     GroupSymbol,
-    KeywordSymbol,
     LabeledSymbol,
+    MoreSymbol,
     NoneExpr,
+    OptionalSymbol,
+    ReferenceSymbol,
     Rule,
+    RuleChoice,
     SeparatedSymbol,
     StringSymbol,
     Symbol,
+    SymbolsChoice,
     SymbolSequence,
     TrueExpr,
 )
@@ -71,10 +76,10 @@ class GrammarBuilder(gm.Grammar):
                 return self._new_terminal(value[1:-1])  # return value
             case LabeledSymbol(label, inner_symbol):
                 return self._encode_symbol(inner_symbol).set_label(label)
-            case KeywordSymbol(keyword, _):
-                if keyword in self.grammar.predefined_terminals:
-                    return self.grammar.find_term(keyword)
-                return self.grammar.add_nt(name=keyword, type=symbol.type).term()
+            case ReferenceSymbol(name, _):
+                if name in self.grammar.predefined_terminals:
+                    return self.grammar.find_term(name)
+                return self.grammar.add_nt(name=name, type=symbol.type).term()
             case SeparatedSymbol(inner_symbol, separator):
                 sep = self.grammar.add_nt(type=symbol.type, prefix="separated").term()
                 head = self._encode_symbol(inner_symbol)
@@ -82,50 +87,45 @@ class GrammarBuilder(gm.Grammar):
                 self._add_rule(
                     sep.nt,
                     [head, self._new_terminal(separator[1:-1]), tail],
-                    gm.ConstructValue(
-                        sep.nt.type, [head.make_param("head"), tail.make_param("tail")]
-                    ),
+                    gm.ConstructValue(sep.type, [head.make_param("head"), tail.make_param("tail")]),
                 )
                 self._add_rule(
-                    sep.nt, [head], gm.ConstructValue(sep.nt.type, [head.make_param("head")])
+                    sep.nt, [head], gm.ConstructValue(sep.type, [head.make_param("head")])
                 )
                 return sep
-            case GroupSymbol(symbols, optional, multiple):
+            case GroupSymbol(symbols):
+                return self._encode_symbol_sequence(symbols)
+
+            case OptionalSymbol(symbols=symbols):
                 head = self._encode_symbol_sequence(symbols)
-                if not multiple and not optional:
-                    return head
-                if multiple:
-                    group = self.grammar.add_nt(type=symbol.type, prefix="list").term()
-                    tail = group.nt.term()
-                    self._add_rule(
-                        group.nt,
-                        [head, tail],
-                        gm.ConstructValue(
-                            group.nt.type, [head.make_param("head"), tail.make_param("tail")]
-                        ),
-                    )
-                    if optional:
-                        self._add_rule(group.nt, [], gm.ConstructValue(group.nt.type, []))
-                    return group
-
-                elif optional:
-                    group = self.grammar.add_nt(type=symbol.type, prefix="optional").term()
-                    self._add_rule(
-                        group.nt,
-                        [head],
-                        gm.NoValue() if head.type != types.none_type else gm.ExprValue(TrueExpr()),
-                    )
-                    self._add_rule(
-                        group.nt,
-                        [],
-                        gm.ExprValue(NoneExpr())
-                        if head.type != types.none_type
-                        else gm.ExprValue(FalseExpr()),
-                    )
-                    return group
-
-                else:
-                    return head
+                group = self.grammar.add_nt(type=symbol.type, prefix="optional").term()
+                self._add_rule(
+                    group.nt,
+                    [head],
+                    gm.NoValue() if head.type != types.none_type else gm.ExprValue(TrueExpr()),
+                )
+                self._add_rule(
+                    group.nt,
+                    [],
+                    gm.ExprValue(NoneExpr())
+                    if head.type != types.none_type
+                    else gm.ExprValue(FalseExpr()),
+                )
+                return group
+            case MoreSymbol(symbols=symbols, optional=optional):
+                head = self._encode_symbol_sequence(symbols)
+                group = self.grammar.add_nt(type=symbol.type, prefix="list").term()
+                tail = group.nt.term()
+                self._add_rule(
+                    group.nt,
+                    [head, tail],
+                    gm.ConstructValue(
+                        group.type, [head.make_param("head"), tail.make_param("tail")]
+                    ),
+                )
+                if optional:
+                    self._add_rule(group.nt, [], gm.ConstructValue(group.type, []))
+                return group
 
     def _encode_symbol_sequence(self, symbol_sequence: SymbolSequence) -> gm.Term:
         syms = [self._encode_symbol(symbol) for symbol in symbol_sequence.symbols]
@@ -133,62 +133,76 @@ class GrammarBuilder(gm.Grammar):
             return syms[0]
 
         seq = self.grammar.add_nt(prefix="sequence", type=symbol_sequence.type).term()
-        match seq.nt.type:
+        match seq.type:
             case types.TupleType():
                 tuple_value = gm.ConstructValue(
-                    seq.nt.type,
-                    [gm.StackValue(f.name, f.type) for f in seq.nt.type.fields],
+                    seq.type,
+                    [gm.StackValue(f.name, f.type) for f in seq.type.fields],
                 )
             case _:
-                tuple_value = gm.ConstructValue(seq.nt.type, [gm.StackValue("keep", seq.nt.type)])
+                tuple_value = gm.ConstructValue(seq.type, [gm.StackValue("keep", seq.type)])
         self._add_rule(seq.nt, syms, tuple_value)
         return seq
 
     def iter_fields(self, *args: types.Type) -> Iterable[types.Field]:
         """Iterate over fields of the given types."""
-        for t in args:
+        for index, t in enumerate(args):
             if isinstance(t, types.CompoundType):
                 yield from t.iter_fields()
+            else:
+                yield types.Field(f"fld{index}", t)
 
-    def _encode_rule(self, rule: Rule) -> None:
-        if rule.is_ref:
-            return
+    def _encode_choice(
+        self, choice: Choice, nt: gm.NonTerminal, before: list[gm.Term] | None = None
+    ) -> None:
+        before = before or []
+        before_types = [t.type for t in before]
+        match choice:
+            case SymbolsChoice(symbols=symbols):
+                # TODO: Duplicated below
+                terms = self._encode_symbol_sequence(symbols)
+                if not isinstance(terms.type, types.TupleType) and not before:
+                    rv = gm.NoValue()
+                else:
+                    rv = gm.ConstructValue(
+                        nt.type,
+                        [
+                            gm.StackValue(t.name, t.type)
+                            for t in self.iter_fields(*before_types, terms.type)
+                        ],
+                    )
+                self._add_rule(nt, [*before, terms], rv)
+            case RuleChoice(rule=rule):
+                self._encode_rule(rule, before)
+                self._add_rule(nt, [self.grammar.find_nt(rule.name).term()], gm.NoValue())
+
+    def _encode_rule(self, rule: Rule, before: list[gm.Term] | None = None) -> None:
+        before = before or []
+        before_types = [t.type for t in before]
         nt = self.grammar.add_nt(name=rule.name, type=rule.type)
         report.emit(f"\n## From `{rule}`")
-        if rule.alts is not None and not rule.terms.symbols:
-            for alt in rule.alts:
-                if alt.is_ref:
-                    alt_nt = self.grammar.add_nt(name=alt.name)
-                else:
-                    self._encode_rule(alt)
-                    alt_nt = self.grammar.find_nt(alt.name)
-                self._add_rule(nt, [alt_nt.term()], gm.NoValue())
-        elif rule.alts is None:
+        if rule.choices is not None:
+            if rule.terms.symbols:
+                shared_terms = [self._encode_symbol_sequence(rule.terms)]
+            else:
+                shared_terms = []
+            for choice in rule.choices:
+                self._encode_choice(choice, nt, [*before, *shared_terms])
+
+        elif rule.choices is None:
             terms = self._encode_symbol_sequence(rule.terms)
 
             if not isinstance(terms.type, types.TupleType):
                 rv = gm.NoValue()
             else:
                 rv = gm.ConstructValue(
-                    nt.type, [gm.StackValue(t.name, t.type) for t in self.iter_fields(terms.type)]
+                    nt.type,
+                    [
+                        gm.StackValue(t.name, t.type)
+                        for t in self.iter_fields(*before_types, terms.type)
+                    ],
                 )
-            self._add_rule(nt, [terms], rv)
-        else:
-            shared_terms = self._encode_symbol_sequence(rule.terms)
-            for alt in rule.alts:
-                if alt.is_ref:
-                    raise ValueError(f"Alternative rule {alt.name} should not be a reference.")
-                if alt.alts is not None:
-                    raise ValueError(f"Alternative rule {alt.name} should not have alternatives.")
-                alt_terms = self._encode_symbol_sequence(alt.terms)
-                self._add_rule(
-                    nt,
-                    [shared_terms, alt_terms],
-                    gm.ConstructValue(
-                        alt.type,
-                        [gm.StackValue(t.name, t.type) for t in self.iter_fields(alt.type)],
-                    ),
-                )
+            self._add_rule(nt, [*before, terms], rv)
 
         report.emit("")
 

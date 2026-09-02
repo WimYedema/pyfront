@@ -42,27 +42,37 @@ class SeparatedSymbol(Symbol):
 
 
 @dataclass
-class KeywordSymbol(Symbol):
-    keyword: str
+class ReferenceSymbol(Symbol):
+    name: str
     rule: Rule | None = None
 
     def __str__(self) -> str:
-        return self.keyword
+        return self.name
 
 
 @dataclass
 class GroupSymbol(Symbol):
     symbols: SymbolSequence
-    optional: bool = False
-    multiple: bool = False
 
     def __str__(self) -> str:
-        if self.multiple:
-            return f"{{ {self.symbols} }}{'' if self.optional else '+'}"
-        elif self.optional:
-            return f"[ {self.symbols} ]"
-        else:
-            return f"( {self.symbols} )"
+        return f"( {self.symbols} )"
+
+
+@dataclass
+class OptionalSymbol(Symbol):
+    symbols: SymbolSequence
+
+    def __str__(self) -> str:
+        return f"[ {self.symbols} ]"
+
+
+@dataclass
+class MoreSymbol(Symbol):
+    symbols: SymbolSequence
+    optional: bool = False
+
+    def __str__(self) -> str:
+        return f"{{ {self.symbols} }}{'' if self.optional else '+'}"
 
 
 @dataclass
@@ -113,26 +123,42 @@ class Field:
 
 
 @dataclass
+class Choice:
+    pass
+
+
+@dataclass
+class RuleChoice(Choice):
+    rule: Rule
+
+    def __str__(self) -> str:
+        return str(self.rule)
+
+
+@dataclass
+class SymbolsChoice(Choice):
+    symbols: SymbolSequence
+
+    def __str__(self) -> str:
+        return str(self.symbols)
+
+
+@dataclass
 class Rule:
     is_root: bool
     name: str
     super_type: str | None
     fields: list[Field]
     terms: SymbolSequence
-    alts: list[Rule] | None
-
-    is_ref: bool = False
-    super_rule: Rule | None = None
+    choices: list[Choice] | None
 
     def __str__(self) -> str:
-        if self.is_ref:
-            return self.name
         terms_str = " ".join(str(term) for term in self.terms.symbols)
-        if not self.alts:
+        if not self.choices:
             return f"{self.name} ::= {terms_str}"
         else:
-            alts_str = " | ".join(str(alt) for alt in self.alts)
-            return f"{self.name} ::= {terms_str} < {alts_str} >"
+            choices_str = " | ".join(str(choice) for choice in self.choices)
+            return f"{self.name} ::= {terms_str} < {choices_str} >"
 
 
 @dataclass

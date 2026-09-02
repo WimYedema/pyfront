@@ -35,8 +35,6 @@ class BuildTypes:
         return self.record_stack[-1].new_field(name, type_)
 
     def pre_rule(self, rule: Rule) -> None:
-        if rule.is_ref:
-            return
         if rule.super_type is not None:
             if len(self.record_stack) > 1:
                 raise ValueError(f"{rule.name}: nested record with super types are not supported")
@@ -58,11 +56,11 @@ class BuildTypes:
         self.current_label = symbol.label
         self.found_keyword = False
 
-    def pre_group_symbol(self, symbol) -> None:
-        if symbol.multiple:
-            self.container_stack.append(ListType)
-        elif symbol.optional:
-            self.container_stack.append(OptionalType)
+    def pre_more_symbol(self, symbol) -> None:
+        self.container_stack.append(ListType)
+
+    def pre_optional_symbol(self, symbol) -> None:
+        self.container_stack.append(OptionalType)
 
     def pre_separated_symbol(self, symbol) -> None:
         self.container_stack.append(ListType)
@@ -70,14 +68,15 @@ class BuildTypes:
     def post_string_symbol(self, symbol) -> None:
         symbol.type = none_type
 
-    def post_keyword_symbol(self, symbol) -> None:
-        symbol.type = self.types.get_type_by_name(symbol.keyword)
-        self.sequence_labels.append(self.current_label)
-        field = self._new_field(self.current_label, symbol.type)
-        if self.default_value is not None:
-            field.default = self.default_value
-            self.default_value = None
-        self.found_keyword = True
+    def post_reference_symbol(self, symbol) -> None:
+        symbol.type = self.types.get_type_by_name(symbol.name)
+        if self.current_label is not None:
+            self.sequence_labels.append(self.current_label)
+            field = self._new_field(self.current_label, symbol.type)
+            if self.default_value is not None:
+                field.default = self.default_value
+                self.default_value = None
+            self.found_keyword = True
 
     def post_labeled_symbol(self, symbol) -> None:
         if not self.found_keyword:
@@ -96,42 +95,40 @@ class BuildTypes:
         outer_labels = self.sequence_labels
         self.sequence_labels = []
         yield
-        syms = [sym for sym in symbol_sequence.symbols if sym.type is not none_type]
-        if len(syms) == 0:
+        typed_syms = [sym for sym in symbol_sequence.symbols if sym.type is not none_type]
+        if len(typed_syms) == 0:
             symbol_sequence.type = none_type
+        elif len(typed_syms) == 1 and len(self.sequence_labels) == 0:
+            symbol_sequence.type = typed_syms[0].type
         else:
-            assert len(syms) == len(self.sequence_labels), "Mismatch between symbols and labels"
-            map = {label: sym.type for label, sym in zip(self.sequence_labels, syms)}
+            assert len(typed_syms) == len(self.sequence_labels), (
+                "Mismatch between symbols and labels"
+            )
+            map = {label: sym.type for label, sym in zip(self.sequence_labels, typed_syms)}
             symbol_sequence.type = self.types.new_tuple(map)
         self.sequence_labels = [*outer_labels, *self.sequence_labels]
 
     def post_group_symbol(self, symbol) -> None:
-        if not symbol.multiple and not symbol.optional:
-            symbol.type = symbol.symbols.type
-            return
+        symbol.type = symbol.symbols.type
+
+    def post_more_symbol(self, symbol) -> None:
         self.container_stack.pop()
         if symbol.symbols.type is none_type:
-            if symbol.multiple:
-                symbol.type = int_type
-            else:
-                symbol.type = bool_type
-        elif len(symbol.symbols.type.fields) == 1:
-            if symbol.multiple:
-                symbol.type = symbol.symbols.type.fields[0].type.list()
-            else:
-                symbol.type = symbol.symbols.type.fields[0].type.optional()
+            symbol.type = int_type
         else:
-            if symbol.multiple:
-                symbol.type = symbol.symbols.type.list()
-            else:
-                symbol.type = symbol.symbols.type.optional()
+            symbol.type = symbol.symbols.type.list()
+
+    def post_optional_symbol(self, symbol) -> None:
+        self.container_stack.pop()
+        if symbol.symbols.type is none_type:
+            symbol.type = bool_type
+        else:
+            symbol.type = symbol.symbols.type.optional()
 
     def post_field(self, field: Field) -> None:
         self.current_label = None
 
     def post_rule(self, rule: Rule) -> None:
-        if rule.is_ref:
-            return
         self.record_stack.pop()
 
     def run(self) -> Model:

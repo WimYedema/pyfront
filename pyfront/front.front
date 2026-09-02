@@ -2,24 +2,25 @@ Front ROOT ::= rules: {Rule} scan_rules: {ScanRule};
 
 Rule ::= 
     FIELD name: Ident
-    FIELD symbols: {Symbol}
     FIELD is_root: Bool = False
     FIELD super_type: [Ident] = None
-    name: Ident is_root: ["ROOT"] super_type: ["<" Ident ] "::=" symbols: {SeparatedSymbol} 
-    < MainRule  ::= ";"
-    | AltRule   ::= alternatives: [ "<" ( SubRule / "|" ) ">"] ";"
-    >
+    FIELD choices: {Choice} = None
+    name: Ident is_root: ["ROOT"] super_type: ["<" Ident ] "::=" terms: SymbolSequence
+    choices: [ "<" ( Choice / "|" ) ">"] ";"
     ;
 
-SubRule < Rule ::= 
-    name: Ident ["::=" symbols: {Symbol}]
-    ;
+Choice ::=
+    < RuleChoice ::= rule: Rule
+    | SymbolsChoice ::= symbols: SymbolSequence
+    >;
 
-Symbol ::= < LabeledSymbol | KeywordSymbol | StringSymbol | GroupSymbol | OptionalSymbol | MoreSymbol >;
+SymbolSequence ::= symbols: {SeparatedSymbol};
+
+Symbol ::= < LabeledSymbol | ReferenceSymbol | StringSymbol | GroupSymbol | OptionalSymbol | MoreSymbol >;
 SeparatedSymbol < Symbol ::= symbol: Symbol ["/" separator: String];
 
 LabeledSymbol < Symbol ::= label: Ident ":" symbol: Symbol ;
-KeywordSymbol < Symbol ::= keyword: Ident;
+ReferenceSymbol < Symbol ::= name: Ident;
 StringSymbol < Symbol ::= value: String;
 GroupSymbol < Symbol ::= "(" symbols: {SeparatedSymbol} ")";
 OptionalSymbol < Symbol ::= "[" symbols: {SeparatedSymbol} "]";
