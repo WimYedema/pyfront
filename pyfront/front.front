@@ -1,11 +1,9 @@
 Front ROOT ::= rules: {Rule} scan_rules: {ScanRule};
 
 Rule ::= 
-    FIELD name: Ident
-    FIELD is_root: Bool = False
-    FIELD super_type: [Ident] = None
-    FIELD choices: {Choice} = None
-    name: Ident is_root: ["ROOT"] super_type: ["<" Ident ] "::=" terms: SymbolSequence
+    name: Ident is_root: ["ROOT"] super_type: ["<" Ident ] "::=" 
+    fields: {Field}
+    terms: SymbolSequence
     choices: [ "<" ( Choice / "|" ) ">"] ";"
     ;
 
