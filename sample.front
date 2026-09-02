@@ -1,0 +1,5 @@
+Root ROOT ::= "START" sequence: {Element};
+
+Element ::= < ElementA | ElementB >;
+ElementA < Element ::= "A" value: String;
+ElementB < Element ::= "B" value: Int;

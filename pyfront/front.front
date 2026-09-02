@@ -1,0 +1,48 @@
+Front ROOT ::= rules: {MainRule};
+
+Rule ::= 
+    FIELD name: String
+    FIELD symbols: {Symbol}
+    FIELD is_root: Bool = False
+    FIELD super_type: [Ident] = None
+
+    < MainRule | AlternativeRule >
+    ;
+
+MainRule < Rule ::= 
+    name: String is_root: ["ROOT"] super_type: ["<" Ident ] 
+    "::=" symbols: {Symbol} 
+    alternatives: [ "<" ( Alternative / "|" ) ">"]
+    post_symbols: {Symbol}
+    ;
+
+AlternativeRule < Rule ::= 
+    name: String "::=" symbols: {Symbol}
+    ;
+
+Symbol ::= < LabeledSymbol | KeywordSymbol | StringSymbol | SeparatedSymbol | GroupSymbol | OptionalSymbol | MoreSymbol >;
+
+LabeledSymbol < Symbol ::= label: String ":" symbol: Symbol ;
+KeywordSymbol < Symbol ::= keyword: Ident;
+StringSymbol < Symbol ::= value: String;
+SeparatedSymbol < Symbol ::= symbol: Symbol "/" separator: String;
+GroupSymbol < Symbol ::= "(" symbols: {Symbol} ")";
+OptionalSymbol < Symbol ::= "[" symbols: {Symbol} "]";
+MoreSymbol < Symbol ::= "{" symbols: {Symbol} "}" plus: ["+"];
+
+Alternative ::= 
+    < AlternativeRef ::= name: Ident 
+    | AlternativeDef ::= rule: AlternativeRule
+    >;
+
+Field ::= "FIELD" name: String ":" symbol: Symbol value: [ "=" Expression ];
+
+Expression ::= 
+    < IdExpr ::= id: Ident 
+    | StringExpr ::= value: String 
+    | IntExpr ::= value: Int 
+    | FloatExpr ::= value: Float
+    | TrueExpr ::= "True"
+    | FalseExpr ::= "False"
+    | NoneExpr ::= "None"
+    >;

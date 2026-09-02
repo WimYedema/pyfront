@@ -24,13 +24,11 @@ def hello(name: str) -> None:
 def generate(front_file: Path, output_dir: Path) -> None:
     """Generate output files from a .front input file into OUTPUT_DIR."""
     try:
-        output_file = run_generate(front_file, output_dir)
+        run_generate(front_file, output_dir)
     except ValueError as exc:
         raise click.BadParameter(str(exc), param_hint="front_file") from exc
     except OSError as exc:
         raise click.ClickException(str(exc)) from exc
-
-    click.echo(f"Generated: {output_file}")
 
 
 if __name__ == "__main__":

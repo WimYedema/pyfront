@@ -6,17 +6,18 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "click>=8.4.2",
+    "inflection>=0.5.1",
 ]
 
 [project.scripts]
-pyfront = "src.__main__:main"
+pyfront = "pyfront.__main__:main"
 
 [build-system]
 requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["pyfront"]
 
 [dependency-groups]
 dev = [
@@ -26,7 +27,7 @@ dev = [
 [tool.ruff]
 target-version = "py314"
 line-length = 100
-src = ["src"]
+src = ["pyfront"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

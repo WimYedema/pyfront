@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from src.generate import run_generate
+from pyfront.generate import run_generate
 
 
 class RunGenerateTests(unittest.TestCase):
