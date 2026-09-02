@@ -1,7 +1,8 @@
 from typing import Self
 
 from pyfront.generate.emitter import Emitter
-from pyfront.lang import model as gm
+from pyfront.generate.expression import gen_expression
+from pyfront.lang import model as lang
 from pyfront.types import model as types
 from pyfront.types.types_builder import BuildTypes
 
@@ -17,7 +18,7 @@ class GenerateModel(GeneratorBase):
         "String": "str",
     }
 
-    def __init__(self, front: gm.Front, emitter: Emitter) -> None:
+    def __init__(self, front: lang.Front, emitter: Emitter) -> None:
         super().__init__(emitter)
         self.front = front
 
@@ -36,21 +37,21 @@ class GenerateModel(GeneratorBase):
             case _:
                 raise ValueError(f"Unknown type: {type}")
 
-    def _gen_expression(self, expr: gm.Expression) -> str:
+    def _gen_expression(self, expr: lang.Expression) -> str:
         match expr:
-            case gm.IdExpr(id=id):
+            case lang.IdExpr(id=id):
                 return f'"{id}"'
-            case gm.StringExpr(value=value):
+            case lang.StringExpr(value=value):
                 return f'"{value}"'
-            case gm.IntExpr(value=value):
+            case lang.IntExpr(value=value):
                 return str(value)
-            case gm.FloatExpr(value=value):
+            case lang.FloatExpr(value=value):
                 return str(value)
-            case gm.TrueExpr():
+            case lang.TrueExpr():
                 return "True"
-            case gm.FalseExpr():
+            case lang.FalseExpr():
                 return "False"
-            case gm.NoneExpr():
+            case lang.NoneExpr():
                 return "None"
             case _:
                 raise ValueError(f"Unknown expression: {expr}")
@@ -70,9 +71,7 @@ class GenerateModel(GeneratorBase):
                 self.emit("pass")
             for field in record.fields:
                 if field.default is not None:
-                    value_str = (
-                        f" = field(kw_only=True, default={self._gen_expression(field.default)})"
-                    )
+                    value_str = f" = field(kw_only=True, default={gen_expression(field.default)})"
                 else:
                     value_str = ""
                 self.emit(f"{field.name}: {self._gen_type(field.type)}{value_str}")

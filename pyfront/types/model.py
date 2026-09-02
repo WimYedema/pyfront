@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from textwrap import indent
+from typing import ClassVar
 
-import pyfront.grammar.model as gm
+import pyfront.lang.model as lang
 
 
 @dataclass
@@ -13,10 +14,10 @@ class Type:
     def is_subtype_of(self, other: Type) -> bool:
         return self == other
 
-    def list(self) -> ListType:
+    def list(self) -> Type:
         return ListType.make(inner_type=self)
 
-    def optional(self) -> OptionalType:
+    def optional(self) -> Type:
         return OptionalType.make(inner_type=self)
 
     def __str__(self) -> str:
@@ -33,6 +34,7 @@ string_type = BuiltinType("String")
 int_type = BuiltinType("Int")
 float_type = BuiltinType("Float")
 bool_type = BuiltinType("Bool")
+none_type = BuiltinType("None")
 
 builtin_type = {
     "Ident": ident_type,
@@ -40,6 +42,7 @@ builtin_type = {
     "Int": int_type,
     "Float": float_type,
     "Bool": bool_type,
+    "None": none_type,
 }
 
 
@@ -59,6 +62,12 @@ class OptionalType(ContainerType):
             return self.inner_type.is_subtype_of(other.inner_type)
         return False
 
+    @classmethod
+    def make(cls, inner_type: Type) -> ContainerType:
+        if isinstance(inner_type, (OptionalType, ListType)):
+            return inner_type
+        return super().make(inner_type=inner_type)
+
 
 @dataclass
 class ListType(ContainerType):
@@ -67,12 +76,15 @@ class ListType(ContainerType):
             return self.inner_type.is_subtype_of(other.inner_type)
         return False
 
+    def optional(self) -> Type:
+        return self
+
 
 @dataclass
 class Field:
     name: str
     type: Type
-    default: gm.Expression | None = None
+    default: lang.Expression | None = None
 
     def __str__(self) -> str:
         value_str = f" = {self.default}" if self.default is not None else ""
@@ -80,9 +92,40 @@ class Field:
 
 
 @dataclass
-class RecordType(Type):
-    super_type: RecordType | None = None
+class CompoundType(Type):
     fields: list[Field] = field(default_factory=list)
+
+    def iter_fields(self) -> Iterable[Field]:
+        """Iterate over fields."""
+        yield from self.fields
+
+    def is_subtype_of(self, other: Type) -> bool:
+        return self == other
+
+    def find_field(self, name: str) -> Field | None:
+        for fld in self.fields:
+            if fld.name == name:
+                return fld
+        return None
+
+    def new_field(self, name: str, type_: Type) -> Field:
+        field = Field(name=name, type=type_)
+        self.add_field(field)
+        return field
+
+    def add_field(self, field: Field) -> None:
+        self.fields.append(field)
+
+
+@dataclass
+class RecordType(CompoundType):
+    super_type: RecordType | None = None
+
+    def iter_fields(self) -> Iterable[Field]:
+        """Iterate over fields of this record and its super types."""
+        if self.super_type is not None:
+            yield from self.super_type.iter_fields()
+        yield from super().iter_fields()
 
     def is_subtype_of(self, other: Type) -> bool:
         if not isinstance(other, RecordType):
@@ -96,20 +139,17 @@ class RecordType(Type):
         return False
 
     def find_field(self, name: str) -> Field | None:
-        for fld in self.fields:
-            if fld.name == name:
-                return fld
+        fld = super().find_field(name)
+        if fld is not None:
+            return fld
         if self.super_type is not None:
             return self.super_type.find_field(name)
         return None
 
-    def new_field(self, name: str, type_: Type) -> Field:
-        field = Field(name=name, type=type_)
-        self.add_field(field)
-        return field
-
-    def add_field(self, field: Field) -> None:
-        self.fields.append(field)
+    def __str__(self) -> str:
+        super_str = f"({self.super_type.name})" if self.super_type else ""
+        fields_str = ", ".join(str(field) for field in self.fields)
+        return f"Record {self.name}{super_str} {{ {fields_str} }}"
 
     def finalize(self) -> None:
         field_map: dict[str, list[Field]] = {}
@@ -142,11 +182,35 @@ class RecordType(Type):
 
         self.fields = final_fields
 
+
+@dataclass
+class TupleType(CompoundType):
+    tuple_counter: ClassVar[int] = 0
+
+    def __post_init__(self) -> None:
+        TupleType.tuple_counter += 1
+
     def __str__(self) -> str:
-        super_str = f"({self.super_type.name})" if self.super_type else ""
         fields_str = ", ".join(str(field) for field in self.fields)
-        fields_str = indent(fields_str, "    ")
-        return f"Record {self.name}{super_str}:\n{{{fields_str}\n}}"
+        return f"Tuple {self.name} {{ {fields_str} }}"
+
+    @classmethod
+    def make(cls, entries: dict[str, Type]) -> TupleType:
+        fields = []
+        for name, type_ in entries.items():
+            if not isinstance(type_, TupleType):
+                fields.append(Field(name=name, type=type_))
+            else:
+                for fld in type_.fields:
+                    fields.append(Field(name=fld.name, type=fld.type))
+        tuple_type = cls(name=f"Tuple{TupleType.tuple_counter}", fields=fields)
+        return tuple_type
+
+    def list(self) -> Type:
+        return TupleType.make({fld.name: fld.type.list() for fld in self.fields})
+
+    def optional(self) -> Type:
+        return TupleType.make({fld.name: fld.type.optional() for fld in self.fields})
 
 
 @dataclass
@@ -173,6 +237,10 @@ class Model:
 
     def add_record(self, record: RecordType) -> None:
         self.records.append(record)
+
+    def new_tuple(self, entries: dict[str, Type]) -> TupleType:
+        tuple_type = TupleType.make(entries=entries)
+        return tuple_type
 
     def find_type_by_name(self, name: str) -> Type | None:
         if name in builtin_type:

@@ -36,7 +36,11 @@ def _into[Walk](type_name: str, walk: Walk, *args: Any) -> Iterable[None]:
     """Context manager to invoke a method on the Walk object."""
     _invoke_walk_method(walk, "pre_" + type_name, *args)
     try:
-        yield
+        method = getattr(walk, "into_" + type_name, None)
+        if callable(method):
+            yield from method(*args)
+        else:
+            yield
     finally:
         _invoke_walk_method(walk, "post_" + type_name, *args)
 

@@ -88,24 +88,24 @@ class Inlining:
             for term in dst_rule.terms:
                 if isinstance(term, NonTerminalTerm) and term.name == src_nt.name:
                     new_terms.extend(src_rule.terms)
-                    if not src_rule.value.is_none():
-                        build_nt = self.grammar.add_nt(f"make_{src_nt.name}")
-                        build_nt.add_rule([], src_rule.value, src_rule.produce_count)
-                        new_terms.append(build_nt.term().set_label(term.label or src_nt.name))
+                    if not src_rule.value.is_no_value():
+                        build_nt = self.grammar.add_nt(f"make_{src_nt.name}", type=src_nt.type)
+                        build_nt.add_rule([], src_rule.value)
+                        new_terms.append(build_nt.term())
                 else:
                     new_terms.append(term)
-            dst_nt.add_rule(new_terms, dst_rule.value, dst_rule.produce_count)
+            dst_nt.add_rule(new_terms, dst_rule.value)
         dst_nt.remove_rule(dst_rule)
 
     def expand_nt(self, src_name: str):
         if src_name in self.recursive_nts:
             return
-        src_nt = self.grammar.get_nt(src_name)
+        src_nt = self.grammar.find_nt(src_name)
         used_in = self.used_by_graph.get(src_name, set())
         if not used_in:
             return
         for dst_name in used_in:
-            dst_nt = self.grammar.get_nt(dst_name)
+            dst_nt = self.grammar.find_nt(dst_name)
             for dst_rule in [*dst_nt.rules]:
                 if rule_has_nt(dst_rule, src_name):
                     self.expand_rules(src_nt, dst_rule)

@@ -6,7 +6,6 @@ from pyfront.generate.parser import GenerateParser
 from pyfront.generate.report import start_report, stop_report
 from pyfront.lang.grammar import Tokenizer, TokenType, parse_front
 from pyfront.lang.parser import Parser
-from pyfront.normalize import Normalize
 from pyfront.support.lexer import Lexer
 from pyfront.symtab import SymbolTable
 
@@ -21,7 +20,6 @@ def run_generate(front_file: Path, output_dir: Path) -> None:
     parser = Parser(Lexer(Tokenizer(), source, eof_token=TokenType._EOF))
     front = parse_front(parser)
     SymbolTable.populate(front)
-    Normalize(front).run()
 
     emitter = FolderEmitter(output_dir)
     start_report(emitter)

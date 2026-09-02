@@ -59,6 +59,7 @@ class TokenType(Enum):
 
 
 class Tokenizer:
+    LiteralText = {}
     TokenRegex = {
         # Keywords
         TokenType.ROOT: r"ROOT(?![a-zA-Z0-9_])",

@@ -32,7 +32,7 @@ class UnexpectedEOF(Exception):
 
 
 class Rule(Protocol):
-    terms: list[NonTerminals]
+    terms: list[NonTerminals | Terminals]
     argument_names: list[str]
 
     def build(self, **kwargs: object) -> object:
@@ -56,7 +56,7 @@ class Reduce:
 
     def reduce(self, values: list[object]) -> object:
         assert len(values) == len(self.argument_names), (
-            f"Expected {len(self.argument_names)} values, got {len(values)}"
+            f"{self.rule.__class__.__name__}: Expected {len(self.argument_names)} values, got {len(values)}"
         )
 
         kwargs = {label: value for label, value in zip(self.argument_names, values, strict=True)}
@@ -104,11 +104,14 @@ class LlParser:
                 )
                 del values[len(values) - count :]
                 rv = top.reduce(children)
-                if rv is not undefined:
+                if isinstance(rv, tuple):
+                    values.extend(rv)
+                elif rv is not undefined:
                     values.append(rv)
             elif isinstance(top, Terminals):
                 if current_token.type == top:
-                    values.append(current_token.value)
+                    if current_token.value is not None:
+                        values.append(current_token.value)
                     current_token = next(tokens, None)
 
                 else:

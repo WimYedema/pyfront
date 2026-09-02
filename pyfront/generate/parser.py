@@ -4,13 +4,13 @@ from typing import Self
 from inflection import camelize, underscore
 
 import pyfront.grammar.model as gm
+import pyfront.types.model as types
+from pyfront.generate.expression import gen_expression
 from pyfront.generate.parse_table import PopulateParseTable
 from pyfront.grammar.grammar_builder import GrammarBuilder
 from pyfront.grammar.inlining import Inlining
 from pyfront.grammar.left_factoring import LeftFactoring
-from pyfront.lang.model import (
-    Front,
-)
+from pyfront.lang.model import Front
 
 from ._base import GeneratorBase
 from .emitter import Emitter
@@ -40,8 +40,13 @@ class GenerateParser(GeneratorBase):
         self.dedent().emit()
 
     def generate_token_map(self) -> None:
+        self.emit("LiteralText = {").indent()
+        for term in sort_terminals(t for t in self.grammar.terminals if t.type == types.none_type):
+            self.emit(f"Terminals.{term.name}: {term.value},")
+        self.dedent().emit("}")
+
         self.emit("TokenRegex = {").indent()
-        for term in sort_terminals(self.grammar.terminals):
+        for term in sort_terminals(t for t in self.grammar.terminals if t.type != types.none_type):
             self.emit(f"Terminals.{term.name}: {term.value},")
         self.dedent().emit("}")
 
@@ -61,39 +66,47 @@ class GenerateParser(GeneratorBase):
         self.dedent()
 
     def generate_constructor(self, rv: gm.RuleValue) -> str:
-        if rv.constructor is None:
-            if len(rv.fields) == 0:
-                return "_undefined"
-            return str(rv.fields[0])
-        else:
-            kwargs = {}
-            args = []
-            for param in rv.fields:
-                assert param.type_ == gm.TermValueType.NONE or param.name is not None, (
-                    "Parameter name should not be None when generating constructor"
-                )
-                match param.type_:
-                    case gm.TermValueType.DIRECT | gm.TermValueType.LIST:
-                        kwargs[param.name] = param.value
-                    case gm.TermValueType.DICT:
-                        args.append(f"**{param.value}")
-            match rv.constructor:
-                case "list":
-                    args = []
-                    if "head" in kwargs:
-                        args.append(kwargs["head"])
-                    if "tail" in kwargs:
-                        args.append(f"*{kwargs['tail']}")
-                    args_str = ", ".join(args)
-                    return f"[{args_str}]"
-                case "dict":
-                    args = [f"{k}={v}" for k, v in kwargs.items()] + args
-                    args_str = ", ".join(args)
-                    return f"{rv.constructor}({args_str})"
-                case _:
-                    args = [f"{k}={v}" for k, v in kwargs.items()] + args
-                    args_str = ", ".join(args)
-                    return f"model.{rv.constructor}({args_str})"
+        match rv:
+            case gm.NoValue(stack=stack):
+                if len(stack) == 0:
+                    return "_undefined"
+                return str(stack[0])
+
+            case gm.ExprValue(expression=expression):
+                return gen_expression(expression)
+
+            case gm.ConstructValue(construct_type=construct_type, stack=stack):
+                kwargs = {}
+                field_map = {}
+                for param in stack:
+                    assert param.type == types.none_type or param.name is not None, (
+                        "Parameter name should not be None when generating constructor"
+                    )
+                    field_map[param.name] = param
+                    kwargs[param.name] = param.name
+
+                match construct_type:
+                    case types.ListType():
+                        args = []
+                        if "head" in kwargs:
+                            args.append(kwargs["head"])
+                        if "tail" in kwargs:
+                            if not isinstance(field_map["tail"].type, types.ListType):
+                                raise ValueError("Expected 'tail' to be of type ListType")
+                            args.append(f"*{kwargs['tail']}")
+                        args_str = ", ".join(args)
+                        return f"[{args_str}]"
+                    case types.TupleType():
+                        args = [v for v in kwargs.values()]
+                        args_str = ", ".join(args)
+                        return f"({args_str},)"
+                    case types.OptionalType():
+                        assert not kwargs, "OptionalType should not have any keyword arguments"
+                        return "None"
+                    case _:
+                        args = [f"{k}={v}" for k, v in kwargs.items()]
+                        args_str = ", ".join(args)
+                        return f"model.{construct_type.name}({args_str})"
 
     def generate_rule_code(self) -> None:
         for index, rule in enumerate(self.grammar.rules):
