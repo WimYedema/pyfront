@@ -1,13 +1,11 @@
 import re
 from collections.abc import Iterable
 from textwrap import dedent, indent
-from typing import Any, TypeVar
+from typing import Any, Self, TypeVar
 
 from inflection import camelize, underscore
 
-from .ll_grammar import Grammar, NonTerminal, NonTerminalTerm, Term, TerminalTerm
-from .ll_grammar import Rule as LlRule
-from .model import (
+from pyfront.lang.model import (
     Front,
     GroupSymbol,
     KeywordSymbol,
@@ -18,6 +16,10 @@ from .model import (
     Symbol,
     SymbolSequence,
 )
+from pyfront.support.ll_grammar import Grammar, NonTerminal, NonTerminalTerm, Term, TerminalTerm
+from pyfront.support.ll_grammar import Rule as LlRule
+
+from ._base import GeneratorBase
 
 
 def _multi_char_replace_regex(text, replacements):
@@ -165,11 +167,11 @@ class GrammarBuilder:
         code = dedent("""\
             from enum import auto
 
-            from pyfront.ll_parser import LlParser as _LlParser
-            from pyfront.ll_parser import Terminals as _Terminals
-            from pyfront.ll_parser import NonTerminals as _NonTerminals
-            from pyfront.ll_parser import Label as _Label
-            from pyfront.lexer import Lexer as _Lexer
+            from pyfront.support.ll_parser import LlParser as _LlParser
+            from pyfront.support.ll_parser import Terminals as _Terminals
+            from pyfront.support.ll_parser import NonTerminals as _NonTerminals
+            from pyfront.support.ll_parser import Label as _Label
+            from pyfront.support.lexer import Lexer as _Lexer
             """)
         code += self.generate_terminals()
         code += self.generate_lexer_code()
@@ -415,3 +417,19 @@ class PopulateParseTable:
         self.compute_first_sets()
         self.compute_follow_sets()
         return self.compute_parsing_table()
+
+
+class GenerateParser(GeneratorBase):
+    def __init__(self, front: Front) -> None:
+        super().__init__()
+        self.front = front
+
+    def run(self) -> Self:
+        self.print("from .model import (")
+        for rule in self.front.rules:
+            self.print(f"    {camelize(rule.name)},")
+        self.print(")\n")
+        grammar_builder = GrammarBuilder()
+        grammar_builder.build(self.front)
+        self.print(grammar_builder.generate_code())
+        return self

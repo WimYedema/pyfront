@@ -2,7 +2,7 @@ from pathlib import Path
 
 import click
 
-from .generate import run_generate
+from pyfront.cmd.generate import run_generate
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})

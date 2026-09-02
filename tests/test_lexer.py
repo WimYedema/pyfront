@@ -1,6 +1,6 @@
 import unittest
 
-from pyfront.lexer import Lexer, SyntaxError, Token, TokenType
+from pyfront.support.lexer import Lexer, SyntaxError, Token, TokenType
 
 
 class LexerTests(unittest.TestCase):

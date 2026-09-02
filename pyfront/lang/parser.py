@@ -3,7 +3,7 @@ from contextlib import AbstractContextManager, contextmanager
 from enum import Enum
 from typing import TypeVar
 
-from .lexer import Lexer, Token
+from pyfront.support.lexer import Lexer, Token
 
 T = TypeVar("T", bound=Enum)
 
