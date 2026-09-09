@@ -154,11 +154,12 @@ class Rule:
 
     def __str__(self) -> str:
         terms_str = " ".join(str(term) for term in self.terms.symbols)
+        fields_str = " ".join(f"{field.name}:{field.type}" for field in self.fields)
         if not self.choices:
-            return f"{self.name} ::= {terms_str}"
+            return f"{self.name} ::= {terms_str} {{ {fields_str} }}"
         else:
             choices_str = " | ".join(str(choice) for choice in self.choices)
-            return f"{self.name} ::= {terms_str} < {choices_str} >"
+            return f"{self.name} ::= {terms_str} {{ {fields_str} }} < {choices_str} >"
 
 
 @dataclass

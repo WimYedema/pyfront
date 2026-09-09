@@ -1,16 +1,41 @@
 import unittest
+from enum import Enum, auto
 
-from pyfront.support.lexer import Lexer, SyntaxError, Token, TokenType
+from pyfront.support.lexer import Lexer, SyntaxError, Token
+
+
+class TokenType(Enum):
+    STRING = auto()
+    IDENT = auto()
+    INT = auto()
+    FLOAT = auto()
+    _EOF = auto()
+
+
+class Tokenizer:
+    LiteralText = {}
+    TokenRegex = {
+        TokenType.STRING: r'\"[^"]*\"',
+        TokenType.IDENT: r"[a-zA-Z_][a-zA-Z0-9_]*",
+        TokenType.INT: r"\d+",
+        TokenType.FLOAT: r"\d+\.\d+",
+    }
+    WhitespaceRegexs = {
+        r"\s+",  # whitespace
+        r"//.*",  # single-line comment"
+        r"/\*[\s\S]*?\*/",  # multi-line comment"
+    }
 
 
 class LexerTests(unittest.TestCase):
     def _collect_tokens(self, source_code: str) -> list[Token]:
-        lexer = Lexer(source_code)
+        tokenizer = Tokenizer()
+        lexer = Lexer(tokens=tokenizer, source_code=source_code, eof_token=TokenType._EOF)
         tokens: list[Token] = []
 
         while True:
             token = lexer.get_next_token()
-            if token is None:
+            if token.type == TokenType._EOF:
                 return tokens
             tokens.append(token)
 
@@ -53,7 +78,7 @@ class LexerTests(unittest.TestCase):
         self.assertEqual((2, 7), (tokens[1].position.line, tokens[1].position.column))
 
     def test_unexpected_character_raises_syntax_error_with_position(self) -> None:
-        lexer = Lexer("@")
+        lexer = Lexer(tokens=Tokenizer(), source_code="@", eof_token=TokenType._EOF)
 
         with self.assertRaises(SyntaxError) as context:
             lexer.get_next_token()

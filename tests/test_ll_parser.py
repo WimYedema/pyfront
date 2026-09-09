@@ -1,8 +1,9 @@
 import unittest
 from enum import auto
 
-from pyfront.support.lexer import Position, Token
+from pyfront.support.lexer import Token
 from pyfront.support.ll_parser import LlParser, NonTerminals, Terminals, undefined
+from pyfront.support.position import Position
 
 
 class Terminal(Terminals):

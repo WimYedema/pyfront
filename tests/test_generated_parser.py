@@ -1,7 +1,7 @@
 import importlib
 import sys
 import unittest
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -12,7 +12,7 @@ from pyfront.support.ll_parser import LlSyntaxError
 
 class GeneratedParserTests(unittest.TestCase):
     @contextmanager
-    def generated_parser(self) -> Iterator[object]:
+    def generated_parser(self) -> Generator[object]:
         grammar_file = Path(__file__).parents[1] / "sample.front"
 
         with TemporaryDirectory() as tmp_dir:

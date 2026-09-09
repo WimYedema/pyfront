@@ -120,6 +120,7 @@ class CompoundType(Type):
 @dataclass
 class RecordType(CompoundType):
     super_type: RecordType | None = None
+    origin: lang.Rule | None = field(default=None, compare=False)
 
     def iter_fields(self) -> Iterable[Field]:
         """Iterate over fields of this record and its super types."""

@@ -113,36 +113,37 @@ def parse_symbol(parser: Parser[TokenType]) -> Symbol:
             if parser.match(TokenType.COLON):
                 label = token.value
                 symbol = parse_symbol(parser)
-                return LabeledSymbol(label=label, symbol=symbol)
-            return ReferenceSymbol(name=token.value)
+                return token.record(LabeledSymbol(label=label, symbol=symbol))
+            return token.record(ReferenceSymbol(name=token.value))
         case TokenType.STRING:
             parser.advance()
-            return StringSymbol(value=token.value)
+            return token.record(StringSymbol(value=token.value))
         case TokenType.LPAREN:
             parser.advance()
             with parser.terminator(TokenType.RPAREN):
                 symbols = parse_symbol_sequence(parser)
-            return GroupSymbol(symbols=symbols)
+            return token.record(GroupSymbol(symbols=symbols))
         case TokenType.LBRACKET:
             parser.advance()
             with parser.terminator(TokenType.RBRACKET):
                 symbols = parse_symbol_sequence(parser)
-            return OptionalSymbol(symbols=symbols)
+            return token.record(OptionalSymbol(symbols=symbols))
         case TokenType.LBRACE:
             parser.advance()
             with parser.terminator(TokenType.RBRACE):
                 symbols = parse_symbol_sequence(parser)
             optional = not parser.match(TokenType.PLUS)
-            return MoreSymbol(symbols=symbols, optional=optional)
+            return token.record(MoreSymbol(symbols=symbols, optional=optional))
         case _:
             raise SyntaxError(f"Unexpected token: {token}")
 
 
 def parse_separated_symbol(parser: Parser[TokenType]) -> Symbol:
+    token = parser.next_token
     symbol = parse_symbol(parser)
     if parser.match(TokenType.SLASH):
         separator = parser.expect(TokenType.STRING)
-        return SeparatedSymbol(symbol=symbol, separator=separator)
+        return token.record(SeparatedSymbol(symbol=symbol, separator=separator))
     else:
         return symbol
 
@@ -153,52 +154,55 @@ def parse_expression(parser: Parser[TokenType]) -> Expression:
     match token.type:
         case TokenType.IDENT:
             parser.advance()
-            return IdExpr(id=token.value)
+            return token.record(IdExpr(id=token.value))
         case TokenType.STRING:
             parser.advance()
-            return StringExpr(value=token.value)
+            return token.record(StringExpr(value=token.value))
         case TokenType.INT:
             parser.advance()
-            return IntExpr(value=int(token.value))
+            return token.record(IntExpr(value=int(token.value)))
         case TokenType.FLOAT:
             parser.advance()
-            return FloatExpr(value=float(token.value))
+            return token.record(FloatExpr(value=float(token.value)))
         case TokenType.TRUE:
             parser.advance()
-            return TrueExpr()
+            return token.record(TrueExpr())
         case TokenType.FALSE:
             parser.advance()
-            return FalseExpr()
+            return token.record(FalseExpr())
         case TokenType.NONE:
             parser.advance()
-            return NoneExpr()
+            return token.record(NoneExpr())
         case _:
             raise SyntaxError(f"Unexpected token: {token}")
 
 
 def parse_field(parser: Parser[TokenType]) -> Field:
     """Parse a field from the lexer."""
+    token = parser.next_token
     name = parser.expect(TokenType.IDENT)
     parser.expect(TokenType.COLON)
     symbol = parse_symbol(parser)
     value = None
     if parser.match(TokenType.EQUALS):
         value = parse_expression(parser)
-    return Field(name=name, type=symbol, value=value)
+    return token.record(Field(name=name, type=symbol, value=value))
 
 
 def parse_symbol_sequence(parser: Parser[TokenType]) -> SymbolSequence:
     """Parse a sequence of symbols from the lexer."""
+    token = parser.next_token
     symbols = [parse_separated_symbol(parser) for _ in parser.multiple()]
-    return SymbolSequence(symbols=symbols)
+    return token.record(SymbolSequence(symbols=symbols))
 
 
 def parse_choice(parser: Parser[TokenType]) -> Choice:
     """Parse a single rule from the lexer."""
+    token = parser.next_token
     match = parser.match(TokenType.IDENT, TokenType.DEFINES)
     if not match:
         seq = parse_symbol_sequence(parser)
-        return SymbolsChoice(symbols=seq)
+        return token.record(SymbolsChoice(symbols=seq))
 
     name, _ = match
     fields = []
@@ -208,20 +212,25 @@ def parse_choice(parser: Parser[TokenType]) -> Choice:
     parser.push_terminator(TokenType.GREATER_THAN, TokenType.OR)
     symbols = parse_symbol_sequence(parser)
     parser.pop_terminator(TokenType.GREATER_THAN, TokenType.OR)
-    return RuleChoice(
-        Rule(
-            is_root=False,
-            name=name,
-            super_type=None,
-            fields=fields,
-            terms=symbols,
-            choices=None,
+    return token.record(
+        RuleChoice(
+            token.record(
+                Rule(
+                    is_root=False,
+                    name=name,
+                    super_type=None,
+                    fields=fields,
+                    terms=symbols,
+                    choices=None,
+                )
+            )
         )
     )
 
 
 def parse_rule(parser: Parser[TokenType]) -> Rule:
     """Parse a single rule from the lexer."""
+    token = parser.next_token
     name = parser.expect(TokenType.IDENT)
     is_root = parser.match(TokenType.ROOT)
     super_type = None
@@ -242,30 +251,34 @@ def parse_rule(parser: Parser[TokenType]) -> Rule:
     else:
         choices = None
 
-    return Rule(
-        is_root=is_root,
-        name=name,
-        super_type=super_type,
-        fields=fields,
-        terms=symbols,
-        choices=choices,
+    return token.record(
+        Rule(
+            is_root=is_root,
+            name=name,
+            super_type=super_type,
+            fields=fields,
+            terms=symbols,
+            choices=choices,
+        )
     )
 
 
 def parse_scan_rule(parser: Parser[TokenType]) -> ScanRule:
     """Parse a scan rule from the lexer."""
     parser.expect(TokenType.SCAN)
+    token = parser.next_token
     name = parser.expect(TokenType.IDENT)
     parser.expect(TokenType.COLON)
     type_ = parser.expect(TokenType.IDENT)
     parser.expect(TokenType.DEFINES)
     pattern = parser.expect(TokenType.STRING)
     parser.expect(TokenType.SEMICOLON)
-    return ScanRule(name=name, type=type_, pattern=pattern)
+    return token.record(ScanRule(name=name, type=type_, pattern=pattern))
 
 
 def parse_front(parser: Parser[TokenType]) -> Front:
     """Parse a .front file using the provided lexer."""
+    token = parser.next_token
     parser.push_terminator(TokenType._EOF, TokenType.SCAN)
     rules = [parse_rule(parser) for _ in parser.multiple()]
     parser.pop_terminator(TokenType._EOF, TokenType.SCAN)
@@ -274,4 +287,4 @@ def parse_front(parser: Parser[TokenType]) -> Front:
             scan_rules = [parse_scan_rule(parser) for _ in parser.multiple()]
     else:
         scan_rules = []
-    return Front(rules=rules, scan_rules=scan_rules)
+    return token.record(Front(rules=rules, scan_rules=scan_rules))
