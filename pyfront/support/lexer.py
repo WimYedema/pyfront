@@ -86,7 +86,10 @@ class Lexer[T]:
             if match and len(match.group(0)) > len(best_match):
                 best_token_type = token_type
                 best_match = match.group(0)
-                token_value = best_match
+                if not match.groupdict():
+                    token_value = best_match
+                else:
+                    token_value = match["value"]
         if best_token_type is not None:
             return Token(best_token_type, token_value, self.advance(best_match))
 

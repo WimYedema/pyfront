@@ -44,7 +44,8 @@ class SeparatedSymbol(Symbol):
 @dataclass
 class ReferenceSymbol(Symbol):
     name: str
-    rule: Rule | None = None
+    rule: Rule | ScanRule | None = None
+    label: str | None = None
 
     def __str__(self) -> str:
         return self.name
@@ -167,6 +168,7 @@ class ScanRule:
     name: str
     type: str
     pattern: str
+    format: str = "{value}"
 
     def __str__(self) -> str:
         return f"SCAN {self.name} : {self.type} ::= {self.pattern}"

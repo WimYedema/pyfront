@@ -3,3 +3,17 @@ Root ROOT ::= "START" sequence: {Element};
 Element ::= < ElementA | ElementB >;
 ElementA < Element ::= "A" value: String;
 ElementB < Element ::= "B" value: Int;
+
+// We should distinguish type-only and rule-only definitions. For example:
+//
+//    rule elementChoice(Element) ::= < ElementA | ElementB >;
+//
+// that does not introduce a type, but may have one. If a type is not supplied it is inferred from the rule.
+// And also:
+//
+//    type Element ::= FIELD name: String = "Foo";
+//
+// to simply define a type without affecting the grammar. It would also make sense to change the sub-type notaton to:
+//
+// ElementA(Element) ::= "A" value: String;
+// ElementB(Element) ::= "B" value: Int;

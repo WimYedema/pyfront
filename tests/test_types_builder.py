@@ -3,10 +3,10 @@ import unittest
 import pyfront.lang.model as lang
 import pyfront.types.model as types
 from pyfront.types.types_builder import (
-    BuildTypes,
     DoubleLabelingError,
     DuplicateLabelError,
     MissingLabelError,
+    build_types,
 )
 
 
@@ -106,28 +106,28 @@ def _one_record(name: str = "Root", **fields) -> types.Model:
 class TestBasicTypes(unittest.TestCase):
     def test_int_field(self):
         root = _one_rule(lang.LabeledSymbol("label", lang.ReferenceSymbol("Int")))
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(label=types.int_type)
         self.assertEqual(model, reference)
         self.assertIs(model.records[0].origin, root.rules[0])
 
     def test_string_field(self):
         root = _one_rule(lang.LabeledSymbol("label", lang.ReferenceSymbol("String")))
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(label=types.string_type)
         self.assertEqual(model, reference)
         self.assertIs(model.records[0].origin, root.rules[0])
 
     def test_ident_field(self):
         root = _one_rule(lang.LabeledSymbol("label", lang.ReferenceSymbol("Ident")))
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(label=types.ident_type)
         self.assertEqual(model, reference)
         self.assertIs(model.records[0].origin, root.rules[0])
 
     def test_float_field(self):
         root = _one_rule(lang.LabeledSymbol("label", lang.ReferenceSymbol("Float")))
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(label=types.float_type)
         self.assertEqual(model, reference)
         self.assertIs(model.records[0].origin, root.rules[0])
@@ -140,7 +140,7 @@ class TestBasicTypesWithLiterals(unittest.TestCase):
             lang.LabeledSymbol("label", lang.ReferenceSymbol("Int")),
             lang.StringSymbol("after"),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(label=types.int_type)
         self.assertEqual(model, reference)
         self.assertIs(model.records[0].origin, root.rules[0])
@@ -151,7 +151,7 @@ class TestBasicTypesWithLiterals(unittest.TestCase):
             lang.LabeledSymbol("label", lang.ReferenceSymbol("String")),
             lang.StringSymbol("after"),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(label=types.string_type)
         self.assertEqual(model, reference)
         self.assertIs(model.records[0].origin, root.rules[0])
@@ -162,7 +162,7 @@ class TestBasicTypesWithLiterals(unittest.TestCase):
             lang.LabeledSymbol("label", lang.ReferenceSymbol("Ident")),
             lang.StringSymbol("after"),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(label=types.ident_type)
         self.assertEqual(model, reference)
         self.assertIs(model.records[0].origin, root.rules[0])
@@ -173,7 +173,7 @@ class TestBasicTypesWithLiterals(unittest.TestCase):
             lang.LabeledSymbol("label", lang.ReferenceSymbol("Float")),
             lang.StringSymbol("after"),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(label=types.float_type)
         self.assertEqual(model, reference)
         self.assertIs(model.records[0].origin, root.rules[0])
@@ -187,7 +187,7 @@ class TestMultipleFields(unittest.TestCase):
             lang.LabeledSymbol("ident_label", lang.ReferenceSymbol("Ident")),
             lang.LabeledSymbol("float_label", lang.ReferenceSymbol("Float")),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             int_label=types.int_type,
             string_label=types.string_type,
@@ -209,7 +209,7 @@ class TestMultipleFields(unittest.TestCase):
             lang.LabeledSymbol("float_label", lang.ReferenceSymbol("Float")),
             lang.StringSymbol("after"),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             int_label=types.int_type,
             string_label=types.string_type,
@@ -228,7 +228,7 @@ class TestMoreSymbol(unittest.TestCase):
                 _more(lang.ReferenceSymbol("String")),
             ),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label=types.string_type.list(),
         )
@@ -241,7 +241,7 @@ class TestMoreSymbol(unittest.TestCase):
                 lang.LabeledSymbol("label", lang.ReferenceSymbol("String")),
             ),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label=types.string_type.list(),
         )
@@ -254,7 +254,7 @@ class TestMoreSymbol(unittest.TestCase):
                 _more(lang.LabeledSymbol("label", lang.ReferenceSymbol("String"))),
             ),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label=types.string_type.list().list(),
         )
@@ -268,7 +268,7 @@ class TestMoreSymbol(unittest.TestCase):
                 _more(_more(lang.ReferenceSymbol("String"))),
             ),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label=types.string_type.list().list(),
         )
@@ -281,7 +281,7 @@ class TestMoreSymbol(unittest.TestCase):
                 lang.LabeledSymbol("label", _more(lang.ReferenceSymbol("String"))),
             ),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label=types.string_type.list().list(),
         )
@@ -295,7 +295,7 @@ class TestMoreSymbol(unittest.TestCase):
                 lang.LabeledSymbol("label2", lang.ReferenceSymbol("String")),
             ),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label1=types.string_type.list(),
             label2=types.string_type.list(),
@@ -310,7 +310,7 @@ class TestMoreSymbol(unittest.TestCase):
                 _more(lang.LabeledSymbol("label2", lang.ReferenceSymbol("String"))),
             ),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label1=types.string_type.list(),
             label2=types.string_type.list().list(),
@@ -325,7 +325,7 @@ class TestMoreSymbol(unittest.TestCase):
                 lang.LabeledSymbol("label2", _more(lang.ReferenceSymbol("String"))),
             ),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label1=types.string_type.list(),
             label2=types.string_type.list().list(),
@@ -339,7 +339,7 @@ class TestOptionalSymbol(unittest.TestCase):
         root = _one_rule(
             lang.LabeledSymbol("label", _optional(lang.ReferenceSymbol("String"))),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label=types.string_type.optional(),
         )
@@ -350,7 +350,7 @@ class TestOptionalSymbol(unittest.TestCase):
         root = _one_rule(
             _optional(lang.LabeledSymbol("label", lang.ReferenceSymbol("String"))),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label=types.string_type.optional(),
         )
@@ -361,7 +361,7 @@ class TestOptionalSymbol(unittest.TestCase):
         root = _one_rule(
             _optional(_more(lang.LabeledSymbol("label", lang.ReferenceSymbol("String")))),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label=types.string_type.list(),
         )
@@ -372,7 +372,7 @@ class TestOptionalSymbol(unittest.TestCase):
         root = _one_rule(
             _more(_optional(lang.LabeledSymbol("label", lang.ReferenceSymbol("String")))),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label=types.string_type.optional().list(),
         )
@@ -385,7 +385,7 @@ class TestSeparatedSymbol(unittest.TestCase):
         root = _one_rule(
             lang.LabeledSymbol("label", _separated(lang.ReferenceSymbol("String"), ",")),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label=types.string_type.list(),
         )
@@ -396,7 +396,7 @@ class TestSeparatedSymbol(unittest.TestCase):
         root = _one_rule(
             _separated(lang.LabeledSymbol("label", lang.ReferenceSymbol("String")), ","),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label=types.string_type.list(),
         )
@@ -407,7 +407,7 @@ class TestSeparatedSymbol(unittest.TestCase):
         root = _one_rule(
             _optional(_separated(lang.LabeledSymbol("label", lang.ReferenceSymbol("String")), ",")),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             label=types.string_type.list(),
         )
@@ -424,7 +424,7 @@ class TestChoice(unittest.TestCase):
             ),
             lang.SymbolsChoice(_seq(lang.LabeledSymbol("int_label", lang.ReferenceSymbol("Int")))),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         reference = _one_record(
             str_label=types.string_type,
             int_label=types.int_type,
@@ -449,7 +449,7 @@ class TestChoice(unittest.TestCase):
             rule_one,
             rule_two,
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         root_type = _record("Root")
         reference = _model(
             root_type,
@@ -468,7 +468,7 @@ class TestChoice(unittest.TestCase):
             lang.RuleChoice(rule_one),
             lang.RuleChoice(rule_two),
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         root_type = _record("Root")
         reference = _model(
             root_type,
@@ -488,7 +488,7 @@ class TestChoice(unittest.TestCase):
             lang.RuleChoice(rule_two),
             before=[lang.LabeledSymbol("super_label", lang.ReferenceSymbol("String"))],
         )
-        model = BuildTypes(root).run()
+        model = build_types(root)
         root_type = _record("Root", super_label=types.string_type)
         reference = _model(
             root_type,
@@ -507,7 +507,7 @@ class TestField(unittest.TestCase):
             _rule("Test"),
             str_label=lang.ReferenceSymbol("String"),
         )
-        model = BuildTypes(_front(rule)).run()
+        model = build_types(_front(rule))
         reference = _model(
             _record("Test", str_label=types.string_type),
         )
@@ -523,7 +523,7 @@ class TestField(unittest.TestCase):
             root,
             int_label=lang.ReferenceSymbol("Int"),
         )
-        model = BuildTypes(_front(root)).run()
+        model = build_types(_front(root))
         reference = _model(
             _record("Root", int_label=types.int_type, label=types.string_type),
         )
@@ -542,7 +542,7 @@ class TestField(unittest.TestCase):
             root,
             str_label=lang.ReferenceSymbol("String"),
         )
-        model = BuildTypes(_front(root)).run()
+        model = build_types(_front(root))
         root_type = _record("Root", str_label=types.string_type)
         reference = _model(
             root_type,
@@ -559,7 +559,7 @@ class TestInvalidSource(unittest.TestCase):
             lang.ReferenceSymbol("String"),
         )
         with self.assertRaises(MissingLabelError):
-            BuildTypes(root).run()
+            build_types(root)
 
     def test_label_outside_more_with_multiple_symbols(self):
         root = _one_rule(
@@ -568,7 +568,7 @@ class TestInvalidSource(unittest.TestCase):
             ),
         )
         with self.assertRaises(DuplicateLabelError):
-            BuildTypes(root).run()
+            build_types(root)
 
     def test_label_outside_optional_with_multiple_symbols(self):
         root = _one_rule(
@@ -581,7 +581,7 @@ class TestInvalidSource(unittest.TestCase):
             )
         )
         with self.assertRaises(DuplicateLabelError):
-            BuildTypes(root).run()
+            build_types(root)
 
     def test_multiple_labels(self):
         root = _one_rule(
@@ -590,7 +590,7 @@ class TestInvalidSource(unittest.TestCase):
             ),
         )
         with self.assertRaises(DoubleLabelingError):
-            BuildTypes(root).run()
+            build_types(root)
 
     def test_multiple_labels_with_more(self):
         root = _one_rule(
@@ -599,7 +599,7 @@ class TestInvalidSource(unittest.TestCase):
             ),
         )
         with self.assertRaises(DoubleLabelingError):
-            BuildTypes(root).run()
+            build_types(root)
 
     def test_field_type_mismatch(self):
         root = _rule(
@@ -611,4 +611,4 @@ class TestInvalidSource(unittest.TestCase):
             label=lang.ReferenceSymbol("Int"),
         )
         with self.assertRaises(ValueError):
-            BuildTypes(_front(root)).run()
+            build_types(_front(root))

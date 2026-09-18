@@ -94,7 +94,7 @@ class Tokenizer:
         TokenType.IDENT: r"[a-zA-Z_][a-zA-Z0-9_]*",
         TokenType.FLOAT: r"\d+\.\d+",
         TokenType.INT: r"\d+",
-        TokenType.STRING: r'"(?:[^"\\]|\\.)*"',
+        TokenType.STRING: r'"(?P<value>(?:[^"\\]|\\.)*)"',
     }
 
     WhitespaceRegexs = {

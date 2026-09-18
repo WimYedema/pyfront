@@ -12,7 +12,6 @@ from pyfront.grammar.inlining import Inlining
 from pyfront.grammar.left_factoring import LeftFactoring
 from pyfront.lang.model import Front
 
-from ._base import GeneratorBase
 from .emitter import Emitter
 
 
@@ -21,7 +20,7 @@ def sort_terminals(terminals: Iterable[gm.Terminal]) -> Iterable[gm.Terminal]:
     return sorted(terminals, key=lambda t: t.prio)
 
 
-class GenerateParser(GeneratorBase):
+class GenerateParser(Emitter):
     def __init__(self, front: Front, emitter: Emitter) -> None:
         super().__init__(emitter)
         self.front = front

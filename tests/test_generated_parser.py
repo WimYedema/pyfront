@@ -37,7 +37,7 @@ class GeneratedParserTests(unittest.TestCase):
         self.assertEqual("Root", result.__class__.__name__)
         self.assertEqual(
             [
-                ("ElementA", '"foo"'),
+                ("ElementA", "foo"),
                 ("ElementB", "42"),
             ],
             [(element.__class__.__name__, element.value) for element in result.sequence],
@@ -61,7 +61,7 @@ class GeneratedParserTests(unittest.TestCase):
         self.assertEqual(
             [
                 ("ElementB", "1"),
-                ("ElementA", '"two"'),
+                ("ElementA", "two"),
                 ("ElementB", "3"),
             ],
             [(element.__class__.__name__, element.value) for element in result.sequence],

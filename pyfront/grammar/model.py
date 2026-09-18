@@ -164,7 +164,9 @@ class Rule:
 @dataclass
 class Grammar:
     predefined_terminals = {
-        "String": TerminalTerm("String", r"""r'\"[^"]*\"'""", type=types.string_type, prio=2),
+        "String": TerminalTerm(
+            "String", r"""r'\"(?P<value>[^"]*)\"'""", type=types.string_type, prio=2
+        ),
         "Ident": TerminalTerm(
             "Ident", r'''r"[a-zA-Z_][a-zA-Z0-9_]*"''', type=types.string_type, prio=2
         ),

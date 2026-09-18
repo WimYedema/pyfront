@@ -118,8 +118,20 @@ class CompoundType(Type):
 
 
 @dataclass
+class Method:
+    name: str
+    return_type: Type = field(default_factory=lambda: none_type)
+    parameters: list[Field] = field(default_factory=list)
+
+    def __str__(self) -> str:
+        params_str = ", ".join(str(param) for param in self.parameters)
+        return f"Method {self.name}({params_str}) -> {self.return_type.name}"
+
+
+@dataclass
 class RecordType(CompoundType):
     super_type: RecordType | None = None
+    methods: list[Method] = field(default_factory=list)
     origin: lang.Rule | None = field(default=None, compare=False)
 
     def iter_fields(self) -> Iterable[Field]:
@@ -139,12 +151,20 @@ class RecordType(CompoundType):
             current = current.super_type
         return False
 
-    def find_field(self, name: str) -> Field | None:
+    def find_field(self, name: str, *, into_super: bool = True) -> Field | None:
         fld = super().find_field(name)
         if fld is not None:
             return fld
-        if self.super_type is not None:
-            return self.super_type.find_field(name)
+        if into_super and self.super_type is not None:
+            return self.super_type.find_field(name, into_super=into_super)
+        return None
+
+    def find_method(self, name: str, *, into_super: bool = True) -> Method | None:
+        for mth in self.methods:
+            if mth.name == name:
+                return mth
+        if into_super and self.super_type is not None:
+            return self.super_type.find_method(name, into_super=into_super)
         return None
 
     def __str__(self) -> str:

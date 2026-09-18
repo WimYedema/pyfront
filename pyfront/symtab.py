@@ -1,6 +1,6 @@
 from typing import Self
 
-from pyfront.lang.model import Front, ReferenceSymbol, Rule
+from pyfront.lang.model import Front, ReferenceSymbol, Rule, ScanRule
 from pyfront.lang.walk import walk_front
 
 
@@ -9,29 +9,37 @@ class SymbolTable:
         self.front = front
         self.adding = True
         self.symbols = {
-            "Ident": None,
-            "Int": None,
-            "String": None,
-            "Float": None,
+            "Ident": ScanRule(name="Ident", type="Ident", pattern=r"[a-zA-Z_][a-zA-Z0-9_]*"),
+            "Int": ScanRule(name="Int", type="Int", pattern=r"[0-9]+"),
+            "String": ScanRule(
+                name="String",
+                type="String",
+                pattern=r"""r'\"(?P<value>[^"]*)\"'""",
+                format='"{value}"',
+            ),
+            "Float": ScanRule(name="Float", type="Float", pattern=r"[0-9]+\.[0-9]+"),
         }
 
-    def add_symbol(self, name: str, symbol) -> None:
+    def add_symbol(self, name: str, symbol: object) -> None:
         if self.adding:
             if name in self.symbols:
                 raise ValueError(f"Duplicate symbol name: {name}")
             self.symbols[name] = symbol
 
-    def get_symbol[T](self, name: str, type: type[T]) -> T:
+    def get_symbol[T](self, name: str, *types: type[T]) -> T:
         symbol = self.symbols.get(name)
-        if symbol is not None and not isinstance(symbol, type):
-            raise ValueError(f"Symbol '{name}' is not of type {type.__name__}.")
+        if symbol is not None and not isinstance(symbol, types):
+            raise ValueError(f"Symbol '{name}' is not of type {types}.")
         return symbol
 
     def pre_rule(self, rule: Rule) -> None:
         self.add_symbol(rule.name, rule)
 
+    def pre_scan_rule(self, rule: ScanRule) -> None:
+        self.add_symbol(rule.name, rule)
+
     def pre_reference_symbol(self, symbol: ReferenceSymbol) -> None:
-        symbol.rule = self.get_symbol(symbol.name, Rule)
+        symbol.rule = self.get_symbol(symbol.name, Rule, ScanRule)
 
     @classmethod
     def populate(cls, front: Front) -> Self:

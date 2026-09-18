@@ -73,7 +73,7 @@ class GrammarBuilder(gm.Grammar):
     def _encode_symbol(self, symbol: Symbol) -> gm.Term:
         match symbol:
             case StringSymbol(value):
-                return self._new_terminal(value[1:-1])  # return value
+                return self._new_terminal(value)  # return value
             case LabeledSymbol(label, inner_symbol):
                 return self._encode_symbol(inner_symbol).set_label(label)
             case ReferenceSymbol(name, _):
